@@ -2,6 +2,7 @@
 using Employee_Management_System_Backend.Data;
 using Employee_Management_System_Backend.Model;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -15,8 +16,15 @@ builder.Services.AddScoped<DepartmentEmployeeRepository>();
 
 
 builder.Services.AddControllers();
+
+
+// Add LeaveRepo
+
+builder.Services.AddScoped<LeaveRepository>();
+
 // Register PayslipRepository for dependency injection
 builder.Services.AddScoped<PayslipRepository>();
+
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
