@@ -39,10 +39,10 @@ namespace Employee_Management_System_Backend.Model
         public required int RoleId { get; set; }
 
         [Required(ErrorMessage = "Password hash is required")]
-        public required byte[] PasswordHash { get; set; }
+        public  byte[] PasswordHash { get; set; }
 
         [Required(ErrorMessage = "Password salt is required")]
-        public required byte[] PasswordSalt { get; set; }
+        public  byte[] PasswordSalt { get; set; }
 
         public bool Status { get; set; } = true;
 
