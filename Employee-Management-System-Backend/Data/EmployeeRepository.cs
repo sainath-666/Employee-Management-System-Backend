@@ -129,26 +129,52 @@ namespace Employee_Management_System_Backend.Data
         // ✅ Mapper (uses SqlDataReader for performance)
         private static Employee MapEmployee(SqlDataReader reader)
         {
-            return new Employee
+            try
             {
-                Id = Convert.ToInt32(reader["Id"]),
-                EmployeeCode = reader["EmployeeCode"].ToString()!,
-                Name = reader["Name"].ToString()!,
-                Email = reader["Email"].ToString()!,
-                MobileNumber = reader["MobileNumber"].ToString()!,
-                Gender = reader["Gender"].ToString()!,
-                DOB = reader["DOB"] == DBNull.Value ? null : Convert.ToDateTime(reader["DOB"]),
-                ProfilePhotoPath = reader["ProfilePhotoPath"] == DBNull.Value ? null : reader["ProfilePhotoPath"].ToString(),
-                RoleId = Convert.ToInt32(reader["RoleId"]),
-                PasswordHash = (byte[])reader["PasswordHash"],
-                PasswordSalt = (byte[])reader["PasswordSalt"],
-                Status = Convert.ToBoolean(reader["Status"]),
-                CreatedBy = reader["CreatedBy"] == DBNull.Value ? null : Convert.ToInt32(reader["CreatedBy"]),
-                CreatedDateTime = Convert.ToDateTime(reader["CreatedDateTime"]),
-                UpdatedBy = reader["UpdatedBy"] == DBNull.Value ? null : Convert.ToInt32(reader["UpdatedBy"]),
-                UpdatedDateTime = reader["UpdatedDateTime"] == DBNull.Value ? null : Convert.ToDateTime(reader["UpdatedDateTime"])
-            };
+                return new Employee
+                {
+                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                    EmployeeCode = reader.GetString(reader.GetOrdinal("EmployeeCode")),
+                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                    Email = reader.GetString(reader.GetOrdinal("Email")),
+                    MobileNumber = reader.GetString(reader.GetOrdinal("MobileNumber")),
+                    Gender = reader.GetString(reader.GetOrdinal("Gender")),
+                    DOB = reader.IsDBNull(reader.GetOrdinal("DOB")) 
+                        ? null 
+                        : reader.GetDateTime(reader.GetOrdinal("DOB")),
+                    ProfilePhotoPath = reader.IsDBNull(reader.GetOrdinal("ProfilePhotoPath"))
+                        ? null
+                        : reader.GetString(reader.GetOrdinal("ProfilePhotoPath")),
+                    RoleId = reader.GetInt32(reader.GetOrdinal("RoleId")),
+                    //PasswordHash = (byte[])reader["PasswordHash"],
+                    //PasswordSalt = (byte[])reader["PasswordSalt"],
+                    Status = reader.GetBoolean(reader.GetOrdinal("Status")),
+                    CreatedBy = reader.IsDBNull(reader.GetOrdinal("CreatedBy"))
+                        ? null
+                        : reader.GetInt32(reader.GetOrdinal("CreatedBy")),
+                    CreatedDateTime = reader.GetDateTime(reader.GetOrdinal("CreatedDateTime")),
+                    UpdatedBy = reader.IsDBNull(reader.GetOrdinal("UpdatedBy"))
+                        ? null
+                        : reader.GetInt32(reader.GetOrdinal("UpdatedBy")),
+                    UpdatedDateTime = reader.IsDBNull(reader.GetOrdinal("UpdatedDateTime"))
+                        ? null
+                        : reader.GetDateTime(reader.GetOrdinal("UpdatedDateTime"))
+                };
+            }
+            catch (InvalidCastException ex)
+            {
+                throw new DataException($"Error converting database values to Employee object. Please check data types: {ex.Message}", ex);
+            }
+            catch (IndexOutOfRangeException ex)
+            {
+                throw new DataException($"Required column missing from query results: {ex.Message}", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new DataException($"Unexpected error mapping Employee data: {ex.Message}", ex);
+            }
         }
+
 
         // ✅ Gender Normalizer
         private static string NormalizeGender(string? gender)
