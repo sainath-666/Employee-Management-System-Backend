@@ -1,11 +1,17 @@
 
+
 using Employee_Management_System_Backend.Data;
 using Employee_Management_System_Backend.Model;
+
 
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+
+// Register RoleRepository as a singleton or scoped (recommended: scoped)
+builder.Services.AddScoped<RoleRepository>();
+
 
 // ✅ Register EmployeeRepository for DI
 builder.Services.AddScoped<EmployeeRepository>();
@@ -26,7 +32,10 @@ builder.Services.AddScoped<LeaveRepository>();
 builder.Services.AddScoped<PayslipRepository>();
 
 
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
+// Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
