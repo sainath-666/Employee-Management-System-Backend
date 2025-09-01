@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using Microsoft.Data.SqlClient; // ✅ Use Microsoft.Data.SqlClient (better than System.Data.SqlClient)
+using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using Employee_Management_System_Backend.Model;
 
 namespace Employee_Management_System_Backend.Data
 {
-    public class EmployeeRepository
+    public class EmployeeRepository : IEmployeeRepository
     {
         private readonly string _connectionString;
 
-        // ✅ Constructor ensures _connectionString is never null
         public EmployeeRepository(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection")
@@ -124,6 +124,101 @@ namespace Employee_Management_System_Backend.Data
             cmd.Parameters.AddWithValue("@Id", id);
             con.Open();
             cmd.ExecuteNonQuery();
+        }
+
+        // Async interface implementations
+        public async Task<IEnumerable<Employee>> GetAllAsync()
+        {
+            var employees = new List<Employee>();
+            using var con = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand("SELECT * FROM Employees", con);
+            await con.OpenAsync();
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                employees.Add(MapEmployee(reader));
+            }
+            return employees;
+        }
+
+        public async Task<Employee?> GetByIdAsync(int id)
+        {
+            using var con = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand("SELECT * FROM Employees WHERE Id = @Id", con);
+            cmd.Parameters.AddWithValue("@Id", id);
+            await con.OpenAsync();
+            using var reader = await cmd.ExecuteReaderAsync();
+            return await reader.ReadAsync() ? MapEmployee(reader) : null;
+        }
+
+        public async Task<int> CreateAsync(Employee employee)
+        {
+            using var con = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand(@"
+                INSERT INTO Employees
+                (EmployeeCode, Name, Email, MobileNumber, Gender, DOB, ProfilePhotoPath, RoleId,
+                 PasswordHash, PasswordSalt, Status, CreatedBy, CreatedDateTime)
+                OUTPUT INSERTED.Id
+                VALUES
+                (@EmployeeCode, @Name, @Email, @MobileNumber, @Gender, @DOB, @ProfilePhotoPath, @RoleId,
+                 @PasswordHash, @PasswordSalt, @Status, @CreatedBy, @CreatedDateTime)", con);
+
+            cmd.Parameters.AddWithValue("@EmployeeCode", employee.EmployeeCode);
+            cmd.Parameters.AddWithValue("@Name", employee.Name);
+            cmd.Parameters.AddWithValue("@Email", employee.Email);
+            cmd.Parameters.AddWithValue("@MobileNumber", employee.MobileNumber);
+            cmd.Parameters.AddWithValue("@Gender", NormalizeGender(employee.Gender));
+            cmd.Parameters.AddWithValue("@DOB", (object?)employee.DOB ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ProfilePhotoPath", (object?)employee.ProfilePhotoPath ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@RoleId", employee.RoleId);
+            cmd.Parameters.AddWithValue("@PasswordHash", employee.PasswordHash);
+            cmd.Parameters.AddWithValue("@PasswordSalt", employee.PasswordSalt);
+            cmd.Parameters.AddWithValue("@Status", employee.Status);
+            cmd.Parameters.AddWithValue("@CreatedBy", (object?)employee.CreatedBy ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@CreatedDateTime", employee.CreatedDateTime);
+
+            await con.OpenAsync();
+            var result = await cmd.ExecuteScalarAsync();
+            return Convert.ToInt32(result);
+        }
+
+        public async Task<int> UpdateAsync(Employee employee)
+        {
+            using var con = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand(@"
+                UPDATE Employees SET
+                    EmployeeCode = @EmployeeCode, Name = @Name, Email = @Email, MobileNumber = @MobileNumber,
+                    Gender = @Gender, DOB = @DOB, ProfilePhotoPath = @ProfilePhotoPath, RoleId = @RoleId,
+                    PasswordHash = @PasswordHash, PasswordSalt = @PasswordSalt, Status = @Status,
+                    UpdatedBy = @UpdatedBy, UpdatedDateTime = @UpdatedDateTime
+                WHERE Id = @Id", con);
+
+            cmd.Parameters.AddWithValue("@Id", employee.Id);
+            cmd.Parameters.AddWithValue("@EmployeeCode", employee.EmployeeCode);
+            cmd.Parameters.AddWithValue("@Name", employee.Name);
+            cmd.Parameters.AddWithValue("@Email", employee.Email);
+            cmd.Parameters.AddWithValue("@MobileNumber", employee.MobileNumber);
+            cmd.Parameters.AddWithValue("@Gender", NormalizeGender(employee.Gender));
+            cmd.Parameters.AddWithValue("@DOB", (object?)employee.DOB ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ProfilePhotoPath", (object?)employee.ProfilePhotoPath ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@RoleId", employee.RoleId);
+            cmd.Parameters.AddWithValue("@PasswordHash", employee.PasswordHash);
+            cmd.Parameters.AddWithValue("@PasswordSalt", employee.PasswordSalt);
+            cmd.Parameters.AddWithValue("@Status", employee.Status);
+            cmd.Parameters.AddWithValue("@UpdatedBy", (object?)employee.UpdatedBy ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@UpdatedDateTime", (object?)employee.UpdatedDateTime ?? DBNull.Value);
+
+            await con.OpenAsync();
+            return await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task<int> DeleteAsync(int id)
+        {
+            using var con = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand("DELETE FROM Employees WHERE Id = @Id", con);
+            cmd.Parameters.AddWithValue("@Id", id);
+            await con.OpenAsync();
+            return await cmd.ExecuteNonQueryAsync();
         }
 
         // ✅ Mapper (uses SqlDataReader for performance)
