@@ -1,4 +1,5 @@
 using Employee_Management_System_Backend.Data;
+using Employee_Management_System_Backend.Model;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +11,20 @@ builder.Services.AddScoped<PayslipRepository>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Configure uploads directory path
+builder.Services.Configure<PayslipUploadSettings>(options =>
+{
+    options.UploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "Uploads", "Payslips");
+});
+
 var app = builder.Build();
+
+// Ensure uploads directory exists
+var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "Uploads", "Payslips");
+if (!Directory.Exists(uploadsPath))
+{
+    Directory.CreateDirectory(uploadsPath);
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -20,6 +34,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Enable serving static files
+app.UseStaticFiles();
 
 app.UseAuthorization();
 
