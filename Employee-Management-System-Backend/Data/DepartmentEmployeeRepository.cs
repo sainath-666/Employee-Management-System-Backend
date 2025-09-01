@@ -1,4 +1,4 @@
-﻿using Employee_Management_System_Backend.Models;
+﻿using Employee_Management_System_Backend.Model;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;

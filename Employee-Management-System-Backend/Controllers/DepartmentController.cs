@@ -1,5 +1,5 @@
 ﻿using Employee_Management_System_Backend.Data;
-using Employee_Management_System_Backend.Models;
+using Employee_Management_System_Backend.Model;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Threading.Tasks;

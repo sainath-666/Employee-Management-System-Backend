@@ -1,4 +1,4 @@
-﻿namespace Employee_Management_System_Backend.Models
+﻿namespace Employee_Management_System_Backend.Model
 {
     public class Department
     {
