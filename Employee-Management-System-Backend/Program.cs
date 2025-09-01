@@ -4,6 +4,11 @@ using Employee_Management_System_Backend.Model;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+
+builder.Services.AddScoped<DepartmentRepository>();
+builder.Services.AddScoped<DepartmentEmployeeRepository>();
+
+
 builder.Services.AddControllers();
 // Register PayslipRepository for dependency injection
 builder.Services.AddScoped<PayslipRepository>();
