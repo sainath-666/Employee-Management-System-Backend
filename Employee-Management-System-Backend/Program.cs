@@ -1,6 +1,11 @@
+using Employee_Management_System_Backend.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddScoped<DepartmentRepository>();
+builder.Services.AddScoped<DepartmentEmployeeRepository>();
+
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
