@@ -38,20 +38,14 @@ namespace Employee_Management_System_Backend.Model
         [Required(ErrorMessage = "Role is required")]
         public required int RoleId { get; set; }
 
-        [Required(ErrorMessage = "Password hash is required")]
-        public  byte[] PasswordHash { get; set; }
-
-        [Required(ErrorMessage = "Password salt is required")]
-        public  byte[] PasswordSalt { get; set; }
+        [Required(ErrorMessage = "Password is required")]
+        [StringLength(255, ErrorMessage = "Password hash cannot exceed 255 characters")]
+        public required string Password { get; set; } // Changed from PasswordHash and PasswordSalt
 
         public bool Status { get; set; } = true;
-
         public int? CreatedBy { get; set; }
-
         public DateTime CreatedDateTime { get; set; } = DateTime.Now;
-
         public int? UpdatedBy { get; set; }
-
         public DateTime? UpdatedDateTime { get; set; }
     }
 }

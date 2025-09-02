@@ -11,10 +11,10 @@ namespace Employee_Management_System_Backend.Controllers
     [ApiController]
     public class EmployeeController : ControllerBase
     {
-        private readonly EmployeeRepository _repository;
+        private readonly IEmployeeRepository _repository; // Use interface
         private readonly IWebHostEnvironment _env;
 
-        public EmployeeController(EmployeeRepository repository, IWebHostEnvironment env)
+        public EmployeeController(IEmployeeRepository repository, IWebHostEnvironment env)
         {
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
             _env = env ?? throw new ArgumentNullException(nameof(env));
@@ -22,17 +22,17 @@ namespace Employee_Management_System_Backend.Controllers
 
         // GET: api/Employee
         [HttpGet]
-        public ActionResult<List<Employee>> GetAll()
+        public async Task<ActionResult<IEnumerable<Employee>>> GetAll()
         {
-            var employees = _repository.GetAll();
+            var employees = await _repository.GetAllAsync();
             return Ok(employees);
         }
 
         // GET: api/Employee/5
         [HttpGet("{id}")]
-        public ActionResult<Employee> GetById(int id)
+        public async Task<ActionResult<Employee>> GetById(int id)
         {
-            var employee = _repository.GetById(id);
+            var employee = await _repository.GetByIdAsync(id);
             return employee == null ? NotFound($"Employee with Id = {id} not found.") : Ok(employee);
         }
 
@@ -43,7 +43,9 @@ namespace Employee_Management_System_Backend.Controllers
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             string? filePath = await SaveProfilePhotoAsync(dto.ProfilePhoto);
-            CreatePasswordHash(dto.Password, out byte[] passwordHash, out byte[] passwordSalt);
+
+            // Hash the password using BCrypt or similar secure method
+            string hashedPassword = HashPassword(dto.Password);
 
             var employee = new Employee
             {
@@ -55,14 +57,13 @@ namespace Employee_Management_System_Backend.Controllers
                 DOB = dto.DOB,
                 ProfilePhotoPath = filePath,
                 RoleId = dto.RoleId,
-                PasswordHash = passwordHash,
-                PasswordSalt = passwordSalt,
+                Password = hashedPassword, // Single hashed password field
                 Status = true,
                 CreatedDateTime = DateTime.Now
             };
 
-            _repository.Create(employee);
-            return Ok("Employee created successfully.");
+            var newId = await _repository.CreateAsync(employee);
+            return Ok(new { Message = "Employee created successfully.", Id = newId });
         }
 
         // PUT: api/Employee/5
@@ -71,7 +72,7 @@ namespace Employee_Management_System_Backend.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var existing = _repository.GetById(id);
+            var existing = await _repository.GetByIdAsync(id);
             if (existing == null) return NotFound($"Employee with Id = {id} not found.");
 
             // Save new photo if provided, else keep existing
@@ -95,32 +96,56 @@ namespace Employee_Management_System_Backend.Controllers
             // Update password only if provided
             if (!string.IsNullOrWhiteSpace(dto.Password))
             {
-                CreatePasswordHash(dto.Password, out byte[] passwordHash, out byte[] passwordSalt);
-                existing.PasswordHash = passwordHash;
-                existing.PasswordSalt = passwordSalt;
+                existing.Password = HashPassword(dto.Password); // Hash new password
             }
 
-            _repository.Update(existing);
-            return Ok("Employee updated successfully.");
+            var rowsAffected = await _repository.UpdateAsync(existing);
+            return rowsAffected > 0
+                ? Ok("Employee updated successfully.")
+                : BadRequest("Failed to update employee.");
         }
 
         // DELETE: api/Employee/5
         [HttpDelete("{id}")]
-        public ActionResult Delete(int id)
+        public async Task<ActionResult> Delete(int id)
         {
-            var existing = _repository.GetById(id);
+            var existing = await _repository.GetByIdAsync(id);
             if (existing == null) return NotFound($"Employee with Id = {id} not found.");
 
-            _repository.Delete(id);
-            return Ok("Employee deleted successfully.");
+            var rowsAffected = await _repository.DeleteAsync(id);
+            return rowsAffected > 0
+                ? Ok("Employee deleted successfully.")
+                : BadRequest("Failed to delete employee.");
         }
 
         // --- Helpers ---
-        private static void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
+
+        /// <summary>
+        /// Hash password using BCrypt (recommended) or similar secure method
+        /// You'll need to install BCrypt.Net-Next NuGet package
+        /// </summary>
+        private static string HashPassword(string password)
         {
-            using var hmac = new HMACSHA512();
-            passwordSalt = hmac.Key;
-            passwordHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
+            // Option 1: Using BCrypt (RECOMMENDED - install BCrypt.Net-Next)
+            // return BCrypt.Net.BCrypt.HashPassword(password);
+
+            // Option 2: Simple SHA256 (less secure, for quick testing only)
+            using var sha256 = SHA256.Create();
+            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password + "YourSaltHere"));
+            return Convert.ToBase64String(hashedBytes);
+        }
+
+        /// <summary>
+        /// Verify password against stored hash
+        /// </summary>
+        public static bool VerifyPassword(string password, string storedHash)
+        {
+            // Option 1: Using BCrypt (RECOMMENDED)
+            // return BCrypt.Net.BCrypt.Verify(password, storedHash);
+
+            // Option 2: Simple SHA256 verification (matches the HashPassword method above)
+            string hashToCompare = HashPassword(password);
+            return hashToCompare == storedHash;
         }
 
         private async Task<string?> SaveProfilePhotoAsync(IFormFile? file)

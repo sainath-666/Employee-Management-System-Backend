@@ -1,7 +1,7 @@
 ﻿
 using Employee_Management_System_Backend.Model;
 using System.Data;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace Employee_Management_System_Backend.Data
 {
@@ -9,7 +9,7 @@ namespace Employee_Management_System_Backend.Data
     {
         private readonly string _connectionString;
 
-        public PayslipRepository(IConfiguration config)
+        public  PayslipRepository(IConfiguration config)
         {
             _connectionString = config.GetConnectionString("DefaultConnection");
         }
