@@ -39,25 +39,5 @@ namespace Employee_Management_System_Backend.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-
-        // POST: api/Auth/validate-token (This should require authentication)
-        [HttpPost("validate-token")]
-        [Authorize] // ADD THIS - This endpoint should require authentication
-        public ActionResult ValidateToken()
-        {
-            // This endpoint can be used by frontend to check if user is still authenticated
-            // The actual validation will be done by JWT middleware
-            return Ok(new { Message = "Token is valid", IsValid = true });
-        }
-
-        // POST: api/Auth/logout (This should require authentication)
-        [HttpPost("logout")]
-        [Authorize] // ADD THIS - This endpoint should require authentication
-        public ActionResult Logout()
-        {
-            // Since JWT is stateless, logout is handled on the client side
-            // by removing the token from storage
-            return Ok(new { Message = "Logout successful" });
-        }
     }
 }

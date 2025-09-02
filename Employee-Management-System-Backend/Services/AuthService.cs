@@ -41,7 +41,7 @@ namespace Employee_Management_System_Backend.Services
             Console.WriteLine($"🔑 Stored password: '{employee.Password}'");
             Console.WriteLine($"🔑 Input password: '{loginDto.Password}'");
 
-            // Verify password
+            // Verify password with hybrid approach
             if (!VerifyPassword(loginDto.Password, employee.Password))
             {
                 Console.WriteLine("❌ Password verification failed");
@@ -95,14 +95,27 @@ namespace Employee_Management_System_Backend.Services
 
         public bool VerifyPassword(string password, string storedHash)
         {
-            // FIXED: Since your database has plain text passwords, do direct comparison
-            return password == storedHash;
+            // HYBRID APPROACH: Handle both plain text and hashed passwords
 
-            // Original hashing code commented out - uncomment when you migrate to hashed passwords:
-            // using var sha256 = SHA256.Create();
-            // var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password + "YourSaltHere"));
-            // string hashToCompare = Convert.ToBase64String(hashedBytes);
-            // return hashToCompare == storedHash;
+            // Check if stored password looks like a hash (hashes are long, typically 40+ chars)
+            if (storedHash.Length < 20)
+            {
+                // Plain text password comparison (for existing users like your "sai123")
+                Console.WriteLine("🔍 Using plain text comparison");
+                return password == storedHash;
+            }
+            else
+            {
+                // Hashed password comparison (for new users created via EmployeeController)
+                Console.WriteLine("🔍 Using hash comparison");
+                using var sha256 = SHA256.Create();
+                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password + "YourSaltHere"));
+                string hashToCompare = Convert.ToBase64String(hashedBytes);
+
+                bool result = hashToCompare == storedHash;
+                Console.WriteLine($"🔐 Hash comparison result: {result}");
+                return result;
+            }
         }
 
         public string HashPassword(string password)
