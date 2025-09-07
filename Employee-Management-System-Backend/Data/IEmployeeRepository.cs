@@ -11,5 +11,8 @@ namespace Employee_Management_System_Backend.Data
         Task<int> CreateAsync(Employee employee);
         Task<int> UpdateAsync(Employee employee);
         Task<int> DeleteAsync(int id);
+
+        // NEW: Method to get employee with department name
+        Task<EmployeeWithDepartment?> GetEmployeeWithDepartmentAsync(int id);
     }
 }

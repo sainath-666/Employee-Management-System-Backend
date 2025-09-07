@@ -17,5 +17,8 @@ namespace Employee_Management_System_Backend.Data
 
         // NEW: Method to create payslip and return the generated ID
         Task<int> AddPayslipWithReturnIdAsync(Payslip payslip);
+
+        // NEW: Method to get payslip with employee details (fixes the "Name" column error)
+        Task<PayslipWithEmployee?> GetPayslipWithEmployeeAsync(int payslipId);
     }
 }

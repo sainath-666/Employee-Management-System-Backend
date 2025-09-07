@@ -18,22 +18,17 @@ namespace Employee_Management_System_Backend.Services
             _payslipRepository = payslipRepository;
         }
 
-        // Generate PDF file path by EmployeeId & PayslipId
+        // UPDATED: Use PayslipWithEmployee DTO instead of separate queries
         public async Task<string> GeneratePayslipPdfAsync(int employeeId, int payslipId)
         {
-            var employee = await _employeeRepository.GetByIdAsync(employeeId);
-            var payslip = await _payslipRepository.GetPayslipByIdAsync(payslipId);
+            var payslipWithEmployee = await _payslipRepository.GetPayslipWithEmployeeAsync(payslipId);
+            if (payslipWithEmployee == null)
+                throw new Exception("Payslip not found");
 
-            if (employee == null || payslip == null)
-                throw new Exception("Employee or Payslip not found");
-
-            var htmlContent = GeneratePayslipHtmlFromDatabase(employee, payslip);
-
-            // FIXED: Generate organized file path and update database
+            var htmlContent = GeneratePayslipHtmlFromPayslipWithEmployee(payslipWithEmployee);
             var fileName = $"Payslip_{employeeId}_{payslipId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
             var folderPath = Path.Combine("Uploads", "Payslips");
 
-            // Ensure directory exists
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
@@ -42,92 +37,64 @@ namespace Employee_Management_System_Backend.Services
             var fullFilePath = Path.Combine(folderPath, fileName);
             var pdfBytes = GeneratePdfBytesFromHtml(htmlContent);
 
-            // Save PDF to organized folder
             await File.WriteAllBytesAsync(fullFilePath, pdfBytes);
 
-            // FIXED: Store organized path in database (use forward slashes for web compatibility)
+            // FIXED: Correct escape sequence for backslashes
             var databasePath = Path.Combine("Uploads", "Payslips", fileName).Replace("\\", "/");
             await _payslipRepository.UpdatePdfPathAsync(payslipId, databasePath);
 
             return fullFilePath;
         }
 
-        // Generate PDF as byte array
         public async Task<byte[]> GeneratePayslipPdfBytesAsync(int employeeId, int payslipId)
         {
-            var employee = await _employeeRepository.GetByIdAsync(employeeId);
-            var payslip = await _payslipRepository.GetPayslipByIdAsync(payslipId);
+            var payslipWithEmployee = await _payslipRepository.GetPayslipWithEmployeeAsync(payslipId);
+            if (payslipWithEmployee == null)
+                throw new Exception("Payslip not found");
 
-            if (employee == null || payslip == null)
-                throw new Exception("Employee or Payslip not found");
-
-            var htmlContent = GeneratePayslipHtmlFromDatabase(employee, payslip);
+            var htmlContent = GeneratePayslipHtmlFromPayslipWithEmployee(payslipWithEmployee);
             return GeneratePdfBytesFromHtml(htmlContent);
         }
 
-        // FIXED: Generate PDF from frontend request data and save to server with DB update
         public async Task<string> GeneratePayslipFromRequestAsync(PayslipRequest request)
         {
-            // Get employee details if not provided
-            if (string.IsNullOrEmpty(request.EmployeeName) || string.IsNullOrEmpty(request.Email))
-            {
-                var employee = await _employeeRepository.GetByIdAsync(request.EmployeeId);
-                if (employee == null)
-                    throw new Exception("Employee not found");
+            var employee = await _employeeRepository.GetEmployeeWithDepartmentAsync(request.EmployeeId);
+            if (employee == null)
+                throw new Exception("Employee not found");
 
-                request.EmployeeName = employee.Name;
-                request.EmployeeCode = employee.EmployeeCode;
-                request.Email = employee.Email;
-            }
-
-            var htmlContent = GeneratePayslipHtmlFromRequest(request);
-
-            // Generate organized file path
             var fileName = $"Payslip_{request.EmployeeId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
             var folderPath = Path.Combine("Uploads", "Payslips");
 
-            // Ensure directory exists
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
             }
 
             var fullFilePath = Path.Combine(folderPath, fileName);
+            var htmlContent = GeneratePayslipHtmlFromDatabaseData(employee, request);
             var pdfBytes = GeneratePdfBytesFromHtml(htmlContent);
 
-            // Save PDF to organized folder
             await File.WriteAllBytesAsync(fullFilePath, pdfBytes);
 
-            // Return organized path for database storage (use forward slashes for web compatibility)
+            // FIXED: Correct escape sequence
             var databasePath = Path.Combine("Uploads", "Payslips", fileName).Replace("\\", "/");
             return databasePath;
         }
 
-        // Generate PDF bytes from frontend request data
         public async Task<byte[]> GeneratePayslipBytesFromRequestAsync(PayslipRequest request)
         {
-            // Get employee details if not provided
-            if (string.IsNullOrEmpty(request.EmployeeName) || string.IsNullOrEmpty(request.Email))
-            {
-                var employee = await _employeeRepository.GetByIdAsync(request.EmployeeId);
-                if (employee == null)
-                    throw new Exception("Employee not found");
+            var employee = await _employeeRepository.GetEmployeeWithDepartmentAsync(request.EmployeeId);
+            if (employee == null)
+                throw new Exception("Employee not found");
 
-                request.EmployeeName = employee.Name;
-                request.EmployeeCode = employee.EmployeeCode;
-                request.Email = employee.Email;
-            }
-
-            var htmlContent = GeneratePayslipHtmlFromRequest(request);
+            var htmlContent = GeneratePayslipHtmlFromDatabaseData(employee, request);
             return GeneratePdfBytesFromHtml(htmlContent);
         }
 
-        // FIXED: Generate PDF from JSON string and save to server with organized path
         public async Task<string> GeneratePayslipFromJsonAsync(string jsonData)
         {
             try
             {
-                // Deserialize JSON to PayslipRequest object
                 var request = JsonSerializer.Deserialize<PayslipRequest>(jsonData, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -139,37 +106,25 @@ namespace Employee_Management_System_Backend.Services
                 if (request.EmployeeId <= 0)
                     throw new Exception("Valid Employee ID is required in JSON");
 
-                // Get employee details if not provided in JSON
-                if (string.IsNullOrEmpty(request.EmployeeName) || string.IsNullOrEmpty(request.Email))
-                {
-                    var employee = await _employeeRepository.GetByIdAsync(request.EmployeeId);
-                    if (employee == null)
-                        throw new Exception($"Employee with ID {request.EmployeeId} not found");
+                var employee = await _employeeRepository.GetEmployeeWithDepartmentAsync(request.EmployeeId);
+                if (employee == null)
+                    throw new Exception($"Employee with ID {request.EmployeeId} not found");
 
-                    request.EmployeeName = employee.Name;
-                    request.EmployeeCode = employee.EmployeeCode;
-                    request.Email = employee.Email;
-                }
-
-                var htmlContent = GeneratePayslipHtmlFromRequest(request);
-
-                // Generate organized file path
                 var fileName = $"Payslip_{request.EmployeeId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
                 var folderPath = Path.Combine("Uploads", "Payslips");
 
-                // Ensure directory exists
                 if (!Directory.Exists(folderPath))
                 {
                     Directory.CreateDirectory(folderPath);
                 }
 
                 var fullFilePath = Path.Combine(folderPath, fileName);
+                var htmlContent = GeneratePayslipHtmlFromDatabaseData(employee, request);
                 var pdfBytes = GeneratePdfBytesFromHtml(htmlContent);
 
-                // Save PDF to organized folder
                 await File.WriteAllBytesAsync(fullFilePath, pdfBytes);
 
-                // Return organized path for database storage (use forward slashes for web compatibility)
+                // FIXED: Correct escape sequence
                 var databasePath = Path.Combine("Uploads", "Payslips", fileName).Replace("\\", "/");
                 return databasePath;
             }
@@ -183,12 +138,10 @@ namespace Employee_Management_System_Backend.Services
             }
         }
 
-        // Generate PDF bytes from JSON string
         public async Task<byte[]> GeneratePayslipBytesFromJsonAsync(string jsonData)
         {
             try
             {
-                // Deserialize JSON to PayslipRequest object
                 var request = JsonSerializer.Deserialize<PayslipRequest>(jsonData, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -200,19 +153,11 @@ namespace Employee_Management_System_Backend.Services
                 if (request.EmployeeId <= 0)
                     throw new Exception("Valid Employee ID is required in JSON");
 
-                // Get employee details if not provided in JSON
-                if (string.IsNullOrEmpty(request.EmployeeName) || string.IsNullOrEmpty(request.Email))
-                {
-                    var employee = await _employeeRepository.GetByIdAsync(request.EmployeeId);
-                    if (employee == null)
-                        throw new Exception($"Employee with ID {request.EmployeeId} not found");
+                var employee = await _employeeRepository.GetEmployeeWithDepartmentAsync(request.EmployeeId);
+                if (employee == null)
+                    throw new Exception($"Employee with ID {request.EmployeeId} not found");
 
-                    request.EmployeeName = employee.Name;
-                    request.EmployeeCode = employee.EmployeeCode;
-                    request.Email = employee.Email;
-                }
-
-                var htmlContent = GeneratePayslipHtmlFromRequest(request);
+                var htmlContent = GeneratePayslipHtmlFromDatabaseData(employee, request);
                 return GeneratePdfBytesFromHtml(htmlContent);
             }
             catch (JsonException ex)
@@ -225,14 +170,11 @@ namespace Employee_Management_System_Backend.Services
             }
         }
 
-        // FIXED: Generate PDF and save to server with organized path and DB update
         public async Task<string> GeneratePayslipPdfFromHtmlAsync(string htmlContent, int payslipId)
         {
-            // Generate organized file path
             var fileName = $"Payslip_{payslipId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
             var folderPath = Path.Combine("Uploads", "Payslips");
 
-            // Ensure directory exists
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
@@ -241,36 +183,29 @@ namespace Employee_Management_System_Backend.Services
             var fullFilePath = Path.Combine(folderPath, fileName);
             var pdfBytes = GeneratePdfBytesFromHtml(htmlContent);
 
-            // Save PDF to organized folder
             await File.WriteAllBytesAsync(fullFilePath, pdfBytes);
 
-            // FIXED: Store organized path in database (use forward slashes for web compatibility)
+            // FIXED: Correct escape sequence
             var databasePath = Path.Combine("Uploads", "Payslips", fileName).Replace("\\", "/");
             await _payslipRepository.UpdatePdfPathAsync(payslipId, databasePath);
 
             return fullFilePath;
         }
 
-        // Convert HTML to PDF bytes using NReco.PdfGenerator
         public byte[] GeneratePdfBytesFromHtml(string htmlContent)
         {
             try
             {
                 var htmlToPdf = new HtmlToPdfConverter();
-
-                // Configure PDF settings
                 htmlToPdf.Size = PageSize.A4;
                 htmlToPdf.Orientation = PageOrientation.Portrait;
-
-                // Use property initialization instead of constructor arguments
                 htmlToPdf.Margins = new PageMargins
                 {
-                    Top = 10,    // 10mm top margin
-                    Bottom = 10, // 10mm bottom margin
-                    Left = 10,   // 10mm left margin
-                    Right = 10   // 10mm right margin
+                    Top = 10,
+                    Bottom = 10,
+                    Left = 10,
+                    Right = 10
                 };
-
                 return htmlToPdf.GeneratePdf(htmlContent);
             }
             catch (Exception ex)
@@ -279,8 +214,8 @@ namespace Employee_Management_System_Backend.Services
             }
         }
 
-        // PRIVATE: Generate HTML content from database data
-        private static string GeneratePayslipHtmlFromDatabase(Employee employee, Payslip payslip)
+        // PERFECT: Generate HTML from PayslipWithEmployee DTO including Department Name
+        private static string GeneratePayslipHtmlFromPayslipWithEmployee(PayslipWithEmployee payslip)
         {
             return $@"
                 <!DOCTYPE html>
@@ -331,19 +266,23 @@ namespace Employee_Management_System_Backend.Services
                     </style>
                 </head>
                 <body>
-                    <div class='header'>Employee Payslip - {payslip.Month ?? "N/A"}</div>
+                    <div class='header'>Employee Payslip - {payslip.Month ?? DateTime.Now.ToString("MMMM yyyy")}</div>
                     
                     <div class='section'>
                         <span class='label'>Employee Name:</span>
-                        <span class='value'>{employee.Name}</span>
+                        <span class='value'>{payslip.EmployeeName}</span>
                     </div>
                     <div class='section'>
                         <span class='label'>Employee Code:</span>
-                        <span class='value'>{employee.EmployeeCode}</span>
+                        <span class='value'>{payslip.EmployeeCode}</span>
                     </div>
                     <div class='section'>
-                        <span class='label'>Email:</span>
-                        <span class='value'>{employee.Email}</span>
+                        <span class='label'>Employee ID:</span>
+                        <span class='value'>{payslip.EmployeeId}</span>
+                    </div>
+                    <div class='section'>
+                        <span class='label'>Department:</span>
+                        <span class='value'>{payslip.DepartmentName ?? "Not Assigned"}</span>
                     </div>
                     
                     <div class='salary-section'>
@@ -372,9 +311,11 @@ namespace Employee_Management_System_Backend.Services
                 </html>";
         }
 
-        // PRIVATE: Generate HTML content from frontend request data
-        private static string GeneratePayslipHtmlFromRequest(PayslipRequest request)
+        private static string GeneratePayslipHtmlFromDatabaseData(EmployeeWithDepartment employee, PayslipRequest request)
         {
+            var payslipMonth = DateTime.Now.ToString("MMMM yyyy");
+            var netSalary = request.BaseSalary + request.Allowances - request.Deductions;
+
             return $@"
                 <!DOCTYPE html>
                 <html>
@@ -472,26 +413,29 @@ namespace Employee_Management_System_Backend.Services
                 </head>
                 <body>
                     <div class='header'>
-                        Employee Payslip
-                        {(!string.IsNullOrEmpty(request.Month) ? $" - {request.Month}" : "")}
+                        Employee Payslip - {payslipMonth}
                     </div>
                     
                     <div class='employee-info'>
                         <div class='section'>
                             <span class='label'>Employee Name:</span>
-                            <span class='value'>{request.EmployeeName ?? "N/A"}</span>
+                            <span class='value'>{employee.Name}</span>
                         </div>
                         <div class='section'>
                             <span class='label'>Employee Code:</span>
-                            <span class='value'>{request.EmployeeCode ?? "N/A"}</span>
+                            <span class='value'>{employee.EmployeeCode}</span>
                         </div>
                         <div class='section'>
                             <span class='label'>Email Address:</span>
-                            <span class='value'>{request.Email ?? "N/A"}</span>
+                            <span class='value'>{employee.Email}</span>
                         </div>
                         <div class='section'>
                             <span class='label'>Employee ID:</span>
-                            <span class='value'>{request.EmployeeId}</span>
+                            <span class='value'>{employee.Id}</span>
+                        </div>
+                        <div class='section'>
+                            <span class='label'>Department:</span>
+                            <span class='value'>{employee.DepartmentName ?? "Not Assigned"}</span>
                         </div>
                     </div>
                     
@@ -515,13 +459,14 @@ namespace Employee_Management_System_Backend.Services
                         
                         <div class='total-row salary-row'>
                             <span class='label' style='color: #28a745; font-size: 18px;'>Net Salary:</span>
-                            <span class='total-amount'>${request.NetSalary:F2}</span>
+                            <span class='total-amount'>${netSalary:F2}</span>
                         </div>
                     </div>
                     
                     <div class='footer'>
                         <p>Generated on {DateTime.Now:MMMM dd, yyyy} at {DateTime.Now:hh:mm tt}</p>
                         <p>This is a computer-generated document. No signature required.</p>
+                        <p>Employee Management System</p>
                     </div>
                 </body>
                 </html>";

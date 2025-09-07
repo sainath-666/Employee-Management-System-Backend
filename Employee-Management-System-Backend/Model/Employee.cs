@@ -33,14 +33,17 @@ namespace Employee_Management_System_Backend.Model
         public DateTime? DOB { get; set; }
 
         [StringLength(250)]
-        public string? ProfilePhotoPath { get; set; } // Stores file path after upload
+        public string? ProfilePhotoPath { get; set; }
 
         [Required(ErrorMessage = "Role is required")]
         public required int RoleId { get; set; }
 
+        // REMOVED: DepartmentId property since Departments table references EmployeeId
+        // The relationship is: Departments.EmployeeId -> Employees.Id
+
         [Required(ErrorMessage = "Password is required")]
         [StringLength(255, ErrorMessage = "Password hash cannot exceed 255 characters")]
-        public required string Password { get; set; } // Changed from PasswordHash and PasswordSalt
+        public required string Password { get; set; }
 
         public bool Status { get; set; } = true;
         public int? CreatedBy { get; set; }

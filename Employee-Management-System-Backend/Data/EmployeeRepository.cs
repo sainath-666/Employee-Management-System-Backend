@@ -19,11 +19,56 @@ namespace Employee_Management_System_Backend.Data
         public EmployeeRepository(IConfiguration configuration, IOptions<EmployeeUploadSettings> uploadSettings)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection")
-                                ?? throw new ArgumentNullException(nameof(configuration), "Connection string 'DefaultConnection' is missing.");  // FIXED: Added proper parameter name
+                                ?? throw new ArgumentNullException(nameof(configuration), "Connection string 'DefaultConnection' is missing.");
             _uploadsPath = uploadSettings.Value.UploadsPath;
         }
 
-        // Create a new employee
+        // CORRECTED: Get employee with department name via proper three-table JOIN
+        public async Task<EmployeeWithDepartment?> GetEmployeeWithDepartmentAsync(int id)
+        {
+            var query = @"
+                SELECT 
+                    e.Id, e.EmployeeCode, e.Name, e.Email, e.MobileNumber, 
+                    e.Gender, e.DOB, e.ProfilePhotoPath, e.RoleId,
+                    e.Status, e.CreatedDateTime,
+                    d.Id AS DepartmentId,
+                    d.DepartmentName AS DepartmentName
+                FROM Employees e
+                LEFT JOIN DepartmentEmployees de ON e.Id = de.EmployeeId
+                LEFT JOIN Departments d ON de.DepartmentId = d.Id
+                WHERE e.Id = @Id";
+
+            await using var con = new SqlConnection(_connectionString);
+            await using var cmd = new SqlCommand(query, con);
+            cmd.Parameters.AddWithValue("@Id", id);
+
+            await con.OpenAsync();
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            if (await reader.ReadAsync())
+            {
+                return new EmployeeWithDepartment
+                {
+                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                    EmployeeCode = reader.GetString(reader.GetOrdinal("EmployeeCode")),
+                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                    Email = reader.GetString(reader.GetOrdinal("Email")),
+                    MobileNumber = reader.GetString(reader.GetOrdinal("MobileNumber")),
+                    Gender = reader.GetString(reader.GetOrdinal("Gender")),
+                    DOB = reader.IsDBNull(reader.GetOrdinal("DOB")) ? null : reader.GetDateTime(reader.GetOrdinal("DOB")),
+                    ProfilePhotoPath = reader.IsDBNull(reader.GetOrdinal("ProfilePhotoPath")) ? null : reader.GetString(reader.GetOrdinal("ProfilePhotoPath")),
+                    RoleId = reader.GetInt32(reader.GetOrdinal("RoleId")),
+                    DepartmentId = reader.IsDBNull(reader.GetOrdinal("DepartmentId")) ? null : reader.GetInt32(reader.GetOrdinal("DepartmentId")),
+                    DepartmentName = reader.IsDBNull(reader.GetOrdinal("DepartmentName")) ? null : reader.GetString(reader.GetOrdinal("DepartmentName")),
+                    Status = reader.GetBoolean(reader.GetOrdinal("Status")),
+                    CreatedDateTime = reader.GetDateTime(reader.GetOrdinal("CreatedDateTime"))
+                };
+            }
+
+            return null;
+        }
+
+        // FIXED: Create employee without DepartmentId
         public async Task<int> CreateAsync(Employee employee)
         {
             await using var con = new SqlConnection(_connectionString);
@@ -33,14 +78,13 @@ namespace Employee_Management_System_Backend.Data
                 OUTPUT INSERTED.Id
                 VALUES
                     (@EmployeeCode, @Name, @Email, @MobileNumber, @Gender, @DOB, @ProfilePhotoPath, @RoleId, @Password, @Status, @CreatedBy, @CreatedDateTime)", con);
-
             AddParameters(cmd, employee);
             await con.OpenAsync();
             var result = await cmd.ExecuteScalarAsync();
             return Convert.ToInt32(result);
         }
 
-        // Update existing employee
+        // FIXED: Update employee without DepartmentId
         public async Task<int> UpdateAsync(Employee employee)
         {
             await using var con = new SqlConnection(_connectionString);
@@ -59,22 +103,24 @@ namespace Employee_Management_System_Backend.Data
                     UpdatedBy = @UpdatedBy,
                     UpdatedDateTime = @UpdatedDateTime
                 WHERE Id = @Id", con);
-
             cmd.Parameters.AddWithValue("@Id", employee.Id);
             AddParameters(cmd, employee, includeAudit: true);
             await con.OpenAsync();
             return await cmd.ExecuteNonQueryAsync();
         }
 
-        // Get all employees
+        // FIXED: Get all employees without DepartmentId
         public async Task<IEnumerable<Employee>> GetAllAsync()
         {
             var employees = new List<Employee>();
             await using var con = new SqlConnection(_connectionString);
-            await using var cmd = new SqlCommand("SELECT * FROM Employees", con);
+            await using var cmd = new SqlCommand(@"
+                SELECT Id, EmployeeCode, Name, Email, MobileNumber, Gender, DOB, 
+                       ProfilePhotoPath, RoleId, Password, Status, 
+                       CreatedBy, CreatedDateTime, UpdatedBy, UpdatedDateTime 
+                FROM Employees", con);
             await con.OpenAsync();
             await using var reader = await cmd.ExecuteReaderAsync();
-
             while (await reader.ReadAsync())
             {
                 employees.Add(MapEmployee(reader));
@@ -82,11 +128,15 @@ namespace Employee_Management_System_Backend.Data
             return employees;
         }
 
-        // Get employee by ID
+        // FIXED: Get employee by ID without DepartmentId
         public async Task<Employee?> GetByIdAsync(int id)
         {
             await using var con = new SqlConnection(_connectionString);
-            await using var cmd = new SqlCommand("SELECT * FROM Employees WHERE Id = @Id", con);
+            await using var cmd = new SqlCommand(@"
+                SELECT Id, EmployeeCode, Name, Email, MobileNumber, Gender, DOB, 
+                       ProfilePhotoPath, RoleId, Password, Status, 
+                       CreatedBy, CreatedDateTime, UpdatedBy, UpdatedDateTime 
+                FROM Employees WHERE Id = @Id", con);
             cmd.Parameters.AddWithValue("@Id", id);
             await con.OpenAsync();
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -105,7 +155,7 @@ namespace Employee_Management_System_Backend.Data
 
         // ====== Helper Methods ======
 
-        // Map SqlDataReader to Employee
+        // FIXED: Employee mapping without DepartmentId
         private static Employee MapEmployee(SqlDataReader reader)
         {
             try
@@ -140,7 +190,6 @@ namespace Employee_Management_System_Backend.Data
         {
             if (string.IsNullOrWhiteSpace(gender))
                 throw new ArgumentException("Gender cannot be empty. Allowed values: Male, Female, Other");
-
             gender = gender.Trim().ToLower();
             return gender switch
             {
@@ -155,20 +204,16 @@ namespace Employee_Management_System_Backend.Data
         private async Task<string?> SaveProfilePhotoAsync(IFormFile? file)
         {
             if (file == null || file.Length == 0) return null;
-
             if (!Directory.Exists(_uploadsPath))
                 Directory.CreateDirectory(_uploadsPath);
-
             var uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
             var fullPath = Path.Combine(_uploadsPath, uniqueFileName);
-
             await using var stream = new FileStream(fullPath, FileMode.Create);
             await file.CopyToAsync(stream);
-
             return $"/uploads/employees/{uniqueFileName}";
         }
 
-        // Add parameters to SqlCommand
+        // FIXED: Add parameters without DepartmentId
         private static void AddParameters(SqlCommand cmd, Employee employee, bool includeAudit = false)
         {
             cmd.Parameters.AddWithValue("@EmployeeCode", employee.EmployeeCode);
@@ -181,7 +226,6 @@ namespace Employee_Management_System_Backend.Data
             cmd.Parameters.AddWithValue("@RoleId", employee.RoleId);
             cmd.Parameters.AddWithValue("@Password", employee.Password);
             cmd.Parameters.AddWithValue("@Status", employee.Status);
-
             if (includeAudit)
             {
                 cmd.Parameters.AddWithValue("@UpdatedBy", (object?)employee.UpdatedBy ?? DBNull.Value);
