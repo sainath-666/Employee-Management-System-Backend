@@ -11,5 +11,11 @@ namespace Employee_Management_System_Backend.Data
         Task<int> AddPayslipAsync(Payslip payslip);
         Task<int> UpdatePayslipAsync(Payslip payslip);
         Task<int> DeletePayslipAsync(int id);
+
+        // NEW: Method to update PDF path after generation
+        Task<int> UpdatePdfPathAsync(int payslipId, string pdfPath);
+
+        // NEW: Method to create payslip and return the generated ID
+        Task<int> AddPayslipWithReturnIdAsync(Payslip payslip);
     }
 }
