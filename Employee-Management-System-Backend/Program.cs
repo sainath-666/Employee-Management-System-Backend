@@ -10,20 +10,40 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddScoped<RoleRepository>();
-builder.Services.AddScoped<EmployeeRepository>();
+// ===== Register Repositories =====
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<DepartmentRepository>();
 builder.Services.AddScoped<DepartmentEmployeeRepository>();
 builder.Services.AddScoped<LeaveRepository>();
-builder.Services.AddScoped<PayslipRepository>();
+builder.Services.AddScoped<RoleRepository>();
+builder.Services.AddScoped<IPayslipRepository, PayslipRepository>();
 
-// Add Authentication services
+// ===== Register Services =====
+builder.Services.AddScoped<IPdfService, PdfService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IAuthRepository, AuthRepository>(); // ADD THIS LINE if you want to use AuthRepository
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 
-// Configure CORS for Angular frontend
+// ===== Configure Upload Paths =====
+var rootDir = Directory.GetCurrentDirectory();
+var wwwRoot = Path.Combine(rootDir, "wwwroot");
+var employeesPath = Path.Combine(wwwRoot, "uploads", "employees");
+var payslipsPath = Path.Combine(rootDir, "Uploads", "Payslips");
+
+// Ensure directories exist
+Directory.CreateDirectory(employeesPath);
+Directory.CreateDirectory(payslipsPath);
+
+builder.Services.Configure<EmployeeUploadSettings>(options =>
+{
+    options.UploadsPath = employeesPath;
+});
+
+builder.Services.Configure<PayslipUploadSettings>(options =>
+{
+    options.UploadsPath = payslipsPath;
+});
+
+// ===== Configure CORS =====
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularApp", policy =>
@@ -35,7 +55,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Configure JWT Authentication
+// ===== JWT Authentication =====
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -43,7 +63,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false; // Set to true in production
+    options.RequireHttpsMetadata = false;
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -58,18 +78,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Add Authorization
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("AdminOnly", policy =>
-        policy.RequireRole("Admin"));
-    options.AddPolicy("HROrAdmin", policy =>
-        policy.RequireRole("HR", "Admin"));
-    options.AddPolicy("AllEmployees", policy =>
-        policy.RequireRole("Employee", "HR", "Admin"));
-});
+// ===== Authorization Policies =====
+// FIXED: Use AddAuthorizationBuilder() to resolve ASP0025 warning
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"))
+    .AddPolicy("HROrAdmin", policy => policy.RequireRole("HR", "Admin"))
+    .AddPolicy("AllEmployees", policy => policy.RequireRole("Employee", "HR", "Admin"));
 
-// Global Authorization - Require authentication for ALL controllers by default
+// ===== Controllers with Global Authorization =====
 builder.Services.AddControllers(options =>
 {
     var policy = new AuthorizationPolicyBuilder()
@@ -78,9 +94,8 @@ builder.Services.AddControllers(options =>
     options.Filters.Add(new AuthorizeFilter(policy));
 });
 
+// ===== Swagger =====
 builder.Services.AddEndpointsApiExplorer();
-
-// Swagger configuration with JWT support
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -90,7 +105,6 @@ builder.Services.AddSwaggerGen(options =>
         Description = "API for Employee Management System with JWT Authentication"
     });
 
-    // Add JWT Authentication to Swagger
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -98,7 +112,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter 'Bearer' [space] and then your valid token in the text input below.\r\n\r\nExample: \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\""
+        Description = "Enter 'Bearer' [space] and then your valid token"
     });
 
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -117,31 +131,9 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Configure uploads directory paths
-var rootDirectory = Directory.GetCurrentDirectory();
-var wwwrootPath = Path.Combine(rootDirectory, "wwwroot");
-var employeesUploadPath = Path.Combine(wwwrootPath, "uploads", "employees");
-var payslipsUploadPath = Path.Combine(rootDirectory, "Uploads", "Payslips");
-
-// Configure paths in services
-builder.Services.Configure<PayslipUploadSettings>(options =>
-{
-    options.UploadsPath = payslipsUploadPath;
-});
-
-builder.Services.Configure<EmployeeUploadSettings>(options =>
-{
-    options.UploadsPath = employeesUploadPath;
-});
-
 var app = builder.Build();
 
-// Ensure all required directories exist
-Directory.CreateDirectory(wwwrootPath);
-Directory.CreateDirectory(employeesUploadPath);
-Directory.CreateDirectory(payslipsUploadPath);
-
-// Configure the HTTP request pipeline.
+// ===== HTTP Request Pipeline =====
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -152,22 +144,16 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Enable CORS
 app.UseCors("AllowAngularApp");
-
-// Enable static file serving
 app.UseStaticFiles();
 
-// Only use HTTPS redirection in production
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
 
-// Authentication & Authorization middleware - ORDER IS IMPORTANT
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();

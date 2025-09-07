@@ -1,25 +1,27 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Employee_Management_System_Backend.Data;
 using Employee_Management_System_Backend.Model;
-using Microsoft.Extensions.Options;
+using Employee_Management_System_Backend.Services;
 
 namespace Employee_Management_System_Backend.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class PayslipsController : ControllerBase
     {
-        private readonly PayslipRepository _repo;
+        private readonly IPayslipRepository _repo;
         private readonly PayslipUploadSettings _uploadSettings;
+        private readonly IPdfService _pdfService;
 
-        public PayslipsController(PayslipRepository repo, IOptions<PayslipUploadSettings> uploadSettings)
+        public PayslipsController(IPayslipRepository repo, IOptions<PayslipUploadSettings> uploadSettings, IPdfService pdfService)
         {
             _repo = repo;
             _uploadSettings = uploadSettings.Value;
+            _pdfService = pdfService;
         }
 
-        // GET: api/payslips
+        // ✅ Get all payslips
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -27,7 +29,7 @@ namespace Employee_Management_System_Backend.Controllers
             return Ok(payslips);
         }
 
-        // GET: api/payslips/5
+        // ✅ Get payslip by ID
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -36,7 +38,7 @@ namespace Employee_Management_System_Backend.Controllers
             return Ok(ps);
         }
 
-        // POST: api/payslips
+        // ✅ Add payslip
         [HttpPost]
         public async Task<IActionResult> Add(Payslip ps)
         {
@@ -46,7 +48,7 @@ namespace Employee_Management_System_Backend.Controllers
             return BadRequest(new { message = "Failed to create payslip" });
         }
 
-        // PUT: api/payslips/5
+        // ✅ Update payslip
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Payslip ps)
         {
@@ -57,7 +59,7 @@ namespace Employee_Management_System_Backend.Controllers
             return NotFound(new { message = "Payslip not found or update failed" });
         }
 
-        // DELETE: api/payslips/5
+        // ✅ Delete payslip
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -67,56 +69,47 @@ namespace Employee_Management_System_Backend.Controllers
             return NotFound(new { message = "Payslip not found" });
         }
 
-        // POST: api/payslips/{id}/upload-pdf
-        [HttpPost("{id}/upload-pdf")]
-        public async Task<IActionResult> UploadPdf(int id, IFormFile file)
+        // ✅ Generate and save payslip PDF for employee
+        [HttpPost("generate/{employeeId}/{payslipId}")]
+        public async Task<IActionResult> GeneratePayslipPdf(int employeeId, int payslipId)
         {
-            if (file == null || file.Length == 0)
-                return BadRequest(new { message = "No file uploaded" });
-
-            if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase))
-                return BadRequest(new { message = "Only PDF files are allowed" });
-
-            var payslip = await _repo.GetPayslipByIdAsync(id);
-            if (payslip == null)
-                return NotFound(new { message = "Payslip not found" });
-
-            // Generate a unique filename
-            var fileName = $"payslip_{id}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
-            var filePath = Path.Combine(_uploadSettings.UploadsPath, fileName);
-
-            // Delete existing file if it exists
-            if (!string.IsNullOrEmpty(payslip.PdfPath) && System.IO.File.Exists(payslip.PdfPath))
+            try
             {
-                System.IO.File.Delete(payslip.PdfPath);
-            }
+                var filePath = await _pdfService.GeneratePayslipPdfAsync(employeeId, payslipId);
 
-            // Save the new file
-            using (var stream = new FileStream(filePath, FileMode.Create))
+                if (string.IsNullOrEmpty(filePath))
+                    return BadRequest(new { message = "Failed to generate PDF" });
+
+                return Ok(new
+                {
+                    message = "PDF generated successfully",
+                    filePath,
+                    fileName = Path.GetFileName(filePath)
+                });
+            }
+            catch (Exception ex)
             {
-                await file.CopyToAsync(stream);
+                return StatusCode(500, new { message = "Error generating PDF", error = ex.Message });
             }
-
-            // Update the payslip with the new file path
-            payslip.PdfPath = filePath;
-            await _repo.UpdatePayslipAsync(payslip);
-
-            return Ok(new { message = "PDF uploaded successfully" });
         }
 
-        // GET: api/payslips/{id}/download-pdf
-        [HttpGet("{id}/download-pdf")]
-        public async Task<IActionResult> DownloadPdf(int id)
+        // ✅ Return payslip PDF as downloadable file
+        [HttpGet("download/{employeeId}/{payslipId}")]
+        public async Task<IActionResult> DownloadPayslipPdf(int employeeId, int payslipId)
         {
-            var payslip = await _repo.GetPayslipByIdAsync(id);
-            if (payslip == null)
-                return NotFound(new { message = "Payslip not found" });
+            try
+            {
+                var pdfBytes = await _pdfService.GeneratePayslipPdfBytesAsync(employeeId, payslipId);
 
-            if (string.IsNullOrEmpty(payslip.PdfPath) || !System.IO.File.Exists(payslip.PdfPath))
-                return NotFound(new { message = "PDF file not found" });
+                if (pdfBytes == null || pdfBytes.Length == 0)
+                    return NotFound(new { message = "Payslip not found" });
 
-            var fileStream = new FileStream(payslip.PdfPath, FileMode.Open, FileAccess.Read);
-            return File(fileStream, "application/pdf", Path.GetFileName(payslip.PdfPath));
+                return File(pdfBytes, "application/pdf", $"Payslip_{employeeId}_{payslipId}.pdf");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error downloading PDF", error = ex.Message });
+            }
         }
     }
 }
