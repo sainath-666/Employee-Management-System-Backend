@@ -20,5 +20,8 @@ namespace Employee_Management_System_Backend.Data
 
         // NEW: Method to get payslip with employee details (fixes the "Name" column error)
         Task<PayslipWithEmployee?> GetPayslipWithEmployeeAsync(int payslipId);
+
+        // NEW: Method to get payslips by employee ID
+        Task<IEnumerable<Payslip>> GetPayslipsByEmployeeIdAsync(int employeeId);
     }
 }

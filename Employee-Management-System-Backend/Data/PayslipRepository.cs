@@ -10,7 +10,6 @@ namespace Employee_Management_System_Backend.Data
     public class PayslipRepository : IPayslipRepository
     {
         private readonly string _connectionString;
-
         public PayslipRepository(IConfiguration config)
         {
             _connectionString = config.GetConnectionString("DefaultConnection")
@@ -23,6 +22,25 @@ namespace Employee_Management_System_Backend.Data
         public Task<int> AddPayslipAsync(Payslip ps) => CreateAsync(ps);
         public Task<int> UpdatePayslipAsync(Payslip ps) => UpdateAsync(ps);
         public Task<int> DeletePayslipAsync(int id) => DeleteAsync(id);
+
+        // New method to get payslips for employee
+        public async Task<IEnumerable<Payslip>> GetPayslipsByEmployeeIdAsync(int employeeId)
+        {
+            var payslips = new List<Payslip>();
+            var query = "SELECT * FROM Payslips WHERE EmployeeId = @EmployeeId ORDER BY CreatedDateTime DESC";
+
+            using var conn = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@EmployeeId", employeeId);
+            await conn.OpenAsync();
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                payslips.Add(MapToPayslip(reader));
+            }
+            return payslips;
+        }
 
         // Update PDF path for existing payslip
         public async Task<int> UpdatePdfPathAsync(int payslipId, string pdfPath)
@@ -42,7 +60,6 @@ namespace Employee_Management_System_Backend.Data
                 (EmployeeId, Salary, BaseSalary, Allowances, Deductions, PdfPath, Month, Status, CreatedBy, CreatedDateTime) 
                 OUTPUT INSERTED.Id
                 VALUES (@EmployeeId, @Salary, @BaseSalary, @Allowances, @Deductions, @PdfPath, @Month, @Status, @CreatedBy, @CreatedDateTime)";
-
             using var conn = new SqlConnection(_connectionString);
             using var cmd = new SqlCommand(query, conn);
             cmd.Parameters.AddWithValue("@EmployeeId", payslip.EmployeeId);
@@ -55,13 +72,12 @@ namespace Employee_Management_System_Backend.Data
             cmd.Parameters.AddWithValue("@Status", payslip.Status);
             cmd.Parameters.AddWithValue("@CreatedBy", (object?)payslip.CreatedBy ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@CreatedDateTime", payslip.CreatedDateTime);
-
             await conn.OpenAsync();
             var result = await cmd.ExecuteScalarAsync();
             return Convert.ToInt32(result);
         }
 
-        // CORRECTED: Get payslip with employee details including department name
+        // Get payslip with employee details including department name
         public async Task<PayslipWithEmployee?> GetPayslipWithEmployeeAsync(int payslipId)
         {
             var query = @"
@@ -75,16 +91,13 @@ namespace Employee_Management_System_Backend.Data
                 LEFT JOIN DepartmentEmployees de ON e.Id = de.EmployeeId
                 LEFT JOIN Departments d ON de.DepartmentId = d.Id
                 WHERE p.Id = @PayslipId";
-
             try
             {
                 await using var con = new SqlConnection(_connectionString);
                 await using var cmd = new SqlCommand(query, con);
                 cmd.Parameters.AddWithValue("@PayslipId", payslipId);
-
                 await con.OpenAsync();
                 await using var reader = await cmd.ExecuteReaderAsync();
-
                 if (await reader.ReadAsync())
                 {
                     return new PayslipWithEmployee
@@ -105,7 +118,6 @@ namespace Employee_Management_System_Backend.Data
                         CreatedDateTime = reader.GetDateTime(reader.GetOrdinal("CreatedDateTime"))
                     };
                 }
-
                 return null;
             }
             catch (Exception ex)
@@ -144,7 +156,6 @@ namespace Employee_Management_System_Backend.Data
             var query = @"INSERT INTO Payslips 
                 (EmployeeId, Salary, BaseSalary, Allowances, Deductions, PdfPath, Month, Status, CreatedBy, CreatedDateTime) 
                 VALUES (@EmployeeId, @Salary, @BaseSalary, @Allowances, @Deductions, @PdfPath, @Month, @Status, @CreatedBy, @CreatedDateTime)";
-
             using var conn = new SqlConnection(_connectionString);
             using var cmd = new SqlCommand(query, conn);
             cmd.Parameters.AddWithValue("@EmployeeId", ps.EmployeeId);
@@ -157,7 +168,6 @@ namespace Employee_Management_System_Backend.Data
             cmd.Parameters.AddWithValue("@Status", ps.Status);
             cmd.Parameters.AddWithValue("@CreatedBy", (object?)ps.CreatedBy ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@CreatedDateTime", ps.CreatedDateTime);
-
             await conn.OpenAsync();
             return await cmd.ExecuteNonQueryAsync();
         }
@@ -169,7 +179,6 @@ namespace Employee_Management_System_Backend.Data
                 Deductions=@Deductions, PdfPath=@PdfPath, Month=@Month, Status=@Status,
                 UpdatedBy=@UpdatedBy, UpdatedDateTime=GETDATE()
                 WHERE Id=@Id";
-
             using var conn = new SqlConnection(_connectionString);
             using var cmd = new SqlCommand(query, conn);
             cmd.Parameters.AddWithValue("@Id", ps.Id);
@@ -181,7 +190,6 @@ namespace Employee_Management_System_Backend.Data
             cmd.Parameters.AddWithValue("@Month", (object?)ps.Month ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@Status", ps.Status);
             cmd.Parameters.AddWithValue("@UpdatedBy", (object?)ps.UpdatedBy ?? DBNull.Value);
-
             await conn.OpenAsync();
             return await cmd.ExecuteNonQueryAsync();
         }
