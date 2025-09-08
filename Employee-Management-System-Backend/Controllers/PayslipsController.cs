@@ -4,6 +4,10 @@ using Employee_Management_System_Backend.Data;
 using Employee_Management_System_Backend.Model;
 using Employee_Management_System_Backend.Services;
 using System.Text.Json;
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Employee_Management_System_Backend.Controllers
 {
@@ -41,16 +45,18 @@ namespace Employee_Management_System_Backend.Controllers
             return Ok(ps);
         }
 
-        // ✅ Add payslip
-        //[HttpPost]
-        //public async Task<IActionResult> Add(Payslip ps)
-        //{
-        //    ps.CreatedDateTime = DateTime.UtcNow;
-        //    var rows = await _repo.AddPayslipAsync(ps);
-        //    if (rows > 0)
-        //        return Ok(new { message = "Payslip created successfully" });
-        //    return BadRequest(new { message = "Failed to create payslip" });
-        //}
+        // Add payslip endpoint commented out
+        /*
+        [HttpPost]
+        public async Task<IActionResult> Add(Payslip ps)
+        {
+            ps.CreatedDateTime = DateTime.UtcNow;
+            var rows = await _repo.AddPayslipAsync(ps);
+            if (rows > 0)
+                return Ok(new { message = "Payslip created successfully" });
+            return BadRequest(new { message = "Failed to create payslip" });
+        }
+        */
 
         // ✅ Update payslip
         [HttpPut("{id}")]
@@ -74,48 +80,25 @@ namespace Employee_Management_System_Backend.Controllers
             return NotFound(new { message = "Payslip not found" });
         }
 
-        //// ✅ Generate and save payslip PDF for employee (existing payslip)
-        //[HttpPost("generate/{employeeId}/{payslipId}")]
-        //public async Task<IActionResult> GeneratePayslipPdf(int employeeId, int payslipId)
-        //{
-        //    try
-        //    {
-        //        var filePath = await _pdfService.GeneratePayslipPdfAsync(employeeId, payslipId);
-        //        if (string.IsNullOrEmpty(filePath))
-        //            return BadRequest(new { message = "Failed to generate PDF" });
-        //        var fileName = Path.GetFileName(filePath);
-        //        return Ok(new
-        //        {
-        //            message = "PDF generated successfully",
-        //            pdfPath = filePath.Replace("\\", "/"),
-        //            fileName,
-        //            downloadUrl = $"/api/payslips/download-file/{fileName}"
-        //        });
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new { message = "Error generating PDF", error = ex.Message });
-        //    }
-        //}
+        // PDF generation endpoint commented out
+        /*
+        [HttpPost("generate/{employeeId}/{payslipId}")]
+        public async Task<IActionResult> GeneratePayslipPdf(int employeeId, int payslipId)
+        {
+            // Implementation
+        }
+        */
 
-        // ✅ Return payslip PDF as downloadable file (existing payslip)
-        //[HttpGet("download/{employeeId}/{payslipId}")]
-        //public async Task<IActionResult> DownloadPayslipPdf(int employeeId, int payslipId)
-        //{
-        //    try
-        //    {
-        //        var pdfBytes = await _pdfService.GeneratePayslipPdfBytesAsync(employeeId, payslipId);
-        //        if (pdfBytes == null || pdfBytes.Length == 0)
-        //            return NotFound(new { message = "Payslip not found" });
-        //        return File(pdfBytes, "application/pdf", $"Payslip_{employeeId}_{payslipId}.pdf");
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new { message = "Error downloading PDF", error = ex.Message });
-        //    }
-        //}
+        // PDF download endpoint commented out
+        /*
+        [HttpGet("download/{employeeId}/{payslipId}")]
+        public async Task<IActionResult> DownloadPayslipPdf(int employeeId, int payslipId)
+        {
+            // Implementation
+        }
+        */
 
-        // ✅ MAIN ENDPOINT - CREATE PAYSLIP + GENERATE PDF with employee data fetching
+        // ✅ MAIN ENDPOINT - CREATE PAYSLIP + GENERATE PDF
         [HttpPost("create-and-generate-pdf")]
         public async Task<IActionResult> CreatePayslipAndGeneratePdf([FromBody] PayslipRequest request)
         {
@@ -123,11 +106,9 @@ namespace Employee_Management_System_Backend.Controllers
             {
                 if (request.EmployeeId <= 0)
                     return BadRequest(new { message = "Valid Employee ID is required" });
-
                 var employee = await _employeeRepository.GetEmployeeWithDepartmentAsync(request.EmployeeId);
                 if (employee == null)
                     return NotFound(new { message = "Employee not found" });
-
                 var payslip = new Payslip
                 {
                     EmployeeId = request.EmployeeId,
@@ -140,12 +121,10 @@ namespace Employee_Management_System_Backend.Controllers
                     CreatedDateTime = DateTime.UtcNow,
                     CreatedBy = request.CreatedBy
                 };
-
                 var payslipId = await _repo.AddPayslipWithReturnIdAsync(payslip);
                 var pdfPath = await _pdfService.GeneratePayslipPdfAsync(request.EmployeeId, payslipId);
                 var fileName = Path.GetFileName(pdfPath);
                 var webCompatiblePath = pdfPath.Replace("\\", "/");
-
                 return Ok(new
                 {
                     message = "Payslip created and PDF generated successfully",
@@ -167,103 +146,41 @@ namespace Employee_Management_System_Backend.Controllers
             }
         }
 
-        // ✅ Generate PDF from data (without DB insert) - returns relative path
-        //[HttpPost("generate-from-data")]
-        //public async Task<IActionResult> GeneratePayslipFromData([FromBody] PayslipRequest request)
-        //{
-        //    try
-        //    {
-        //        if (request.EmployeeId <= 0)
-        //            return BadRequest(new { message = "Valid Employee ID is required" });
-        //        var relativePdfPath = await _pdfService.GeneratePayslipFromRequestAsync(request);
-        //        if (string.IsNullOrEmpty(relativePdfPath))
-        //            return BadRequest(new { message = "Failed to generate PDF" });
-        //        var fileName = Path.GetFileName(relativePdfPath);
-        //        var webCompatiblePath = relativePdfPath.Replace("\\", "/");
-        //        return Ok(new
-        //        {
-        //            message = "PDF generated successfully",
-        //            pdfPath = webCompatiblePath,
-        //            fileName,
-        //            downloadUrl = $"/api/payslips/download-file/{fileName}",
-        //            serveUrl = $"/api/payslips/serve/{fileName}"
-        //        });
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new { message = "Error generating PDF", error = ex.Message });
-        //    }
-        //}
+        // Generate-from-data endpoint commented out
+        /*
+        [HttpPost("generate-from-data")]
+        public async Task<IActionResult> GeneratePayslipFromData([FromBody] PayslipRequest request)
+        {
+            // Implementation
+        }
+        */
 
-        // ✅ Download PDF directly from PayslipRequest data
-        //[HttpPost("download-from-data")]
-        //public async Task<IActionResult> DownloadPayslipFromData([FromBody] PayslipRequest request)
-        //{
-        //    try
-        //    {
-        //        if (request.EmployeeId <= 0)
-        //            return BadRequest(new { message = "Valid Employee ID is required" });
-        //        var pdfBytes = await _pdfService.GeneratePayslipBytesFromRequestAsync(request);
-        //        if (pdfBytes == null || pdfBytes.Length == 0)
-        //            return BadRequest(new { message = "Failed to generate PDF" });
-        //        var fileName = $"Payslip_{request.EmployeeId}_{DateTime.Now:yyyyMMdd}.pdf";
-        //        return File(pdfBytes, "application/pdf", fileName);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new { message = "Error generating PDF", error = ex.Message });
-        //    }
-        //}
+        // Download-from-data endpoint commented out
+        /*
+        [HttpPost("download-from-data")]
+        public async Task<IActionResult> DownloadPayslipFromData([FromBody] PayslipRequest request)
+        {
+            // Implementation
+        }
+        */
 
-        //// ✅ Generate PDF from JSON with proper path storage
-        //[HttpPost("generate-from-json")]
-        //public async Task<IActionResult> GeneratePayslipFromJson([FromBody] JsonElement jsonData)
-        //{
-        //    try
-        //    {
-        //        var jsonString = jsonData.GetRawText();
-        //        if (string.IsNullOrEmpty(jsonString))
-        //            return BadRequest(new { message = "JSON data is required" });
-        //        var relativePdfPath = await _pdfService.GeneratePayslipFromJsonAsync(jsonString);
-        //        if (string.IsNullOrEmpty(relativePdfPath))
-        //            return BadRequest(new { message = "Failed to generate PDF from JSON" });
-        //        var fileName = Path.GetFileName(relativePdfPath);
-        //        var webCompatiblePath = relativePdfPath.Replace("\\", "/");
-        //        return Ok(new
-        //        {
-        //            message = "PDF generated successfully from JSON",
-        //            pdfPath = webCompatiblePath,
-        //            fileName,
-        //            downloadUrl = $"/api/payslips/download-file/{fileName}",
-        //            serveUrl = $"/api/payslips/serve/{fileName}"
-        //        });
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new { message = "Error generating PDF from JSON", error = ex.Message });
-        //    }
-        //}
+        // Generate-from-json endpoint commented out
+        /*
+        [HttpPost("generate-from-json")]
+        public async Task<IActionResult> GeneratePayslipFromJson([FromBody] JsonElement jsonData)
+        {
+            // Implementation
+        }
+        */
 
-        // ✅ Download PDF directly from JSON string
-        //[HttpPost("download-from-json")]
-        //public async Task<IActionResult> DownloadPayslipFromJson([FromBody] JsonElement jsonData)
-        //{
-        //    try
-        //    {
-        //        var jsonString = jsonData.GetRawText();
-        //        if (string.IsNullOrEmpty(jsonString))
-        //            return BadRequest(new { message = "JSON data is required" });
-        //        var pdfBytes = await _pdfService.GeneratePayslipBytesFromJsonAsync(jsonString);
-        //        if (pdfBytes == null || pdfBytes.Length == 0)
-        //            return BadRequest(new { message = "Failed to generate PDF from JSON" });
-        //        var fileName = $"Payslip_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
-        //        return File(pdfBytes, "application/pdf", fileName);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new { message = "Error generating PDF from JSON", error = ex.Message });
-        //    }
-        //}
+        // Download-from-json endpoint commented out
+        /*
+        [HttpPost("download-from-json")]
+        public async Task<IActionResult> DownloadPayslipFromJson([FromBody] JsonElement jsonData)
+        {
+            // Implementation
+        }
+        */
 
         // ✅ Download saved PDF file by filename
         [HttpGet("download-file/{fileName}")]
@@ -283,22 +200,33 @@ namespace Employee_Management_System_Backend.Controllers
             }
         }
 
-        // ✅ Serve PDF files securely (controlled access)
-        //[HttpGet("serve/{fileName}")]
-        //public IActionResult ServePdf(string fileName)
-        //{
-        //    try
-        //    {
-        //        var filePath = Path.Combine("Uploads", "Payslips", fileName);
-        //        if (!System.IO.File.Exists(filePath))
-        //            return NotFound(new { message = "PDF file not found" });
-        //        var fileBytes = System.IO.File.ReadAllBytes(filePath);
-        //        return File(fileBytes, "application/pdf");
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new { message = "Error serving PDF", error = ex.Message });
-        //    }
-        //}
+        // New endpoint to download the latest payslip PDF by employee ID
+        [HttpGet("download-latest/{employeeId}")]
+        public async Task<IActionResult> DownloadLatestPayslipByEmployee(int employeeId)
+        {
+            var payslips = await _repo.GetPayslipsByEmployeeIdAsync(employeeId);
+            var latestPayslip = payslips?.OrderByDescending(p => p.CreatedDateTime).FirstOrDefault();
+
+            if (latestPayslip == null || string.IsNullOrEmpty(latestPayslip.PdfPath))
+                return NotFound(new { message = "Payslip PDF not found for employee" });
+
+            var filePath = Path.Combine(Directory.GetCurrentDirectory(), latestPayslip.PdfPath);
+            if (!System.IO.File.Exists(filePath))
+                return NotFound(new { message = "Payslip PDF file does not exist on the server" });
+
+            var fileBytes = await System.IO.File.ReadAllBytesAsync(filePath);
+            var fileName = Path.GetFileName(filePath);
+
+            return File(fileBytes, "application/pdf", fileName);
+        }
+
+        // Serve PDF files endpoint commented out
+        /*
+        [HttpGet("serve/{fileName}")]
+        public IActionResult ServePdf(string fileName)
+        {
+            // Implementation
+        }
+        */
     }
 }
