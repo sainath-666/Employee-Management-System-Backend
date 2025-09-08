@@ -83,12 +83,11 @@ namespace Employee_Management_System_Backend.Controllers
                 var filePath = await _pdfService.GeneratePayslipPdfAsync(employeeId, payslipId);
                 if (string.IsNullOrEmpty(filePath))
                     return BadRequest(new { message = "Failed to generate PDF" });
-
                 var fileName = Path.GetFileName(filePath);
                 return Ok(new
                 {
                     message = "PDF generated successfully",
-                    pdfPath = filePath.Replace("\\", "/"), // FIXED: Correct escape sequence
+                    pdfPath = filePath.Replace("\\", "/"),
                     fileName,
                     downloadUrl = $"/api/payslips/download-file/{fileName}"
                 });
@@ -108,7 +107,6 @@ namespace Employee_Management_System_Backend.Controllers
                 var pdfBytes = await _pdfService.GeneratePayslipPdfBytesAsync(employeeId, payslipId);
                 if (pdfBytes == null || pdfBytes.Length == 0)
                     return NotFound(new { message = "Payslip not found" });
-
                 return File(pdfBytes, "application/pdf", $"Payslip_{employeeId}_{payslipId}.pdf");
             }
             catch (Exception ex)
@@ -126,42 +124,35 @@ namespace Employee_Management_System_Backend.Controllers
                 if (request.EmployeeId <= 0)
                     return BadRequest(new { message = "Valid Employee ID is required" });
 
-                // FIXED: Fetch employee data from database to ensure data accuracy
                 var employee = await _employeeRepository.GetEmployeeWithDepartmentAsync(request.EmployeeId);
                 if (employee == null)
                     return NotFound(new { message = "Employee not found" });
 
-                // Step 1: Create payslip record with DATABASE data
                 var payslip = new Payslip
                 {
                     EmployeeId = request.EmployeeId,
-                    Salary = request.BaseSalary + request.Allowances, // Total salary
+                    Salary = request.BaseSalary + request.Allowances,
                     BaseSalary = request.BaseSalary,
                     Allowances = request.Allowances,
                     Deductions = request.Deductions,
-                    // NetSalary is computed by database - don't set it
-                    Month = DateTime.Now.ToString("MMMM yyyy"), // Auto-set current month
-                    Status = true, // Active payslip
+                    Month = DateTime.Now.ToString("MMMM yyyy"),
+                    Status = true,
                     CreatedDateTime = DateTime.UtcNow,
-                    // CreatedBy = GetCurrentUserId() // Set this if you have user tracking
+                    CreatedBy = request.CreatedBy
                 };
 
-                // Step 2: Insert payslip and get the generated ID
                 var payslipId = await _repo.AddPayslipWithReturnIdAsync(payslip);
-
-                // Step 3: Generate PDF and automatically update PdfPath in database
                 var pdfPath = await _pdfService.GeneratePayslipPdfAsync(request.EmployeeId, payslipId);
-
                 var fileName = Path.GetFileName(pdfPath);
-                var webCompatiblePath = pdfPath.Replace("\\", "/"); // FIXED: Correct escape sequence
+                var webCompatiblePath = pdfPath.Replace("\\", "/");
 
                 return Ok(new
                 {
                     message = "Payslip created and PDF generated successfully",
                     payslipId,
-                    pdfPath = webCompatiblePath, // Returns: Uploads/Payslips/filename.pdf
+                    pdfPath = webCompatiblePath,
                     fileName,
-                    employeeName = employee.Name, // Return fetched employee data
+                    employeeName = employee.Name,
                     employeeCode = employee.EmployeeCode,
                     employeeEmail = employee.Email,
                     departmentName = employee.DepartmentName,
@@ -184,18 +175,15 @@ namespace Employee_Management_System_Backend.Controllers
             {
                 if (request.EmployeeId <= 0)
                     return BadRequest(new { message = "Valid Employee ID is required" });
-
                 var relativePdfPath = await _pdfService.GeneratePayslipFromRequestAsync(request);
                 if (string.IsNullOrEmpty(relativePdfPath))
                     return BadRequest(new { message = "Failed to generate PDF" });
-
                 var fileName = Path.GetFileName(relativePdfPath);
-                var webCompatiblePath = relativePdfPath.Replace("\\", "/"); // FIXED: Correct escape sequence
-
+                var webCompatiblePath = relativePdfPath.Replace("\\", "/");
                 return Ok(new
                 {
                     message = "PDF generated successfully",
-                    pdfPath = webCompatiblePath, // Returns: Uploads/Payslips/filename.pdf
+                    pdfPath = webCompatiblePath,
                     fileName,
                     downloadUrl = $"/api/payslips/download-file/{fileName}",
                     serveUrl = $"/api/payslips/serve/{fileName}"
@@ -215,11 +203,9 @@ namespace Employee_Management_System_Backend.Controllers
             {
                 if (request.EmployeeId <= 0)
                     return BadRequest(new { message = "Valid Employee ID is required" });
-
                 var pdfBytes = await _pdfService.GeneratePayslipBytesFromRequestAsync(request);
                 if (pdfBytes == null || pdfBytes.Length == 0)
                     return BadRequest(new { message = "Failed to generate PDF" });
-
                 var fileName = $"Payslip_{request.EmployeeId}_{DateTime.Now:yyyyMMdd}.pdf";
                 return File(pdfBytes, "application/pdf", fileName);
             }
@@ -238,18 +224,15 @@ namespace Employee_Management_System_Backend.Controllers
                 var jsonString = jsonData.GetRawText();
                 if (string.IsNullOrEmpty(jsonString))
                     return BadRequest(new { message = "JSON data is required" });
-
                 var relativePdfPath = await _pdfService.GeneratePayslipFromJsonAsync(jsonString);
                 if (string.IsNullOrEmpty(relativePdfPath))
                     return BadRequest(new { message = "Failed to generate PDF from JSON" });
-
                 var fileName = Path.GetFileName(relativePdfPath);
-                var webCompatiblePath = relativePdfPath.Replace("\\", "/"); // FIXED: Correct escape sequence
-
+                var webCompatiblePath = relativePdfPath.Replace("\\", "/");
                 return Ok(new
                 {
                     message = "PDF generated successfully from JSON",
-                    pdfPath = webCompatiblePath, // Returns: Uploads/Payslips/filename.pdf
+                    pdfPath = webCompatiblePath,
                     fileName,
                     downloadUrl = $"/api/payslips/download-file/{fileName}",
                     serveUrl = $"/api/payslips/serve/{fileName}"
@@ -270,11 +253,9 @@ namespace Employee_Management_System_Backend.Controllers
                 var jsonString = jsonData.GetRawText();
                 if (string.IsNullOrEmpty(jsonString))
                     return BadRequest(new { message = "JSON data is required" });
-
                 var pdfBytes = await _pdfService.GeneratePayslipBytesFromJsonAsync(jsonString);
                 if (pdfBytes == null || pdfBytes.Length == 0)
                     return BadRequest(new { message = "Failed to generate PDF from JSON" });
-
                 var fileName = $"Payslip_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
                 return File(pdfBytes, "application/pdf", fileName);
             }
@@ -293,7 +274,6 @@ namespace Employee_Management_System_Backend.Controllers
                 var filePath = Path.Combine("Uploads", "Payslips", fileName);
                 if (!System.IO.File.Exists(filePath))
                     return NotFound(new { message = "PDF file not found" });
-
                 var fileBytes = System.IO.File.ReadAllBytes(filePath);
                 return File(fileBytes, "application/pdf", fileName);
             }
@@ -312,9 +292,7 @@ namespace Employee_Management_System_Backend.Controllers
                 var filePath = Path.Combine("Uploads", "Payslips", fileName);
                 if (!System.IO.File.Exists(filePath))
                     return NotFound(new { message = "PDF file not found" });
-
                 var fileBytes = System.IO.File.ReadAllBytes(filePath);
-                // Return as inline PDF (opens in browser)
                 return File(fileBytes, "application/pdf");
             }
             catch (Exception ex)

@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-
 namespace Employee_Management_System_Backend.Model
 {
     public class PayslipRequest
@@ -17,5 +16,9 @@ namespace Employee_Management_System_Backend.Model
 
         [Range(0, double.MaxValue, ErrorMessage = "Deductions cannot be negative")]
         public decimal Deductions { get; set; }
+
+        [Required(ErrorMessage = "CreatedBy is required")]
+        [Range(1, int.MaxValue, ErrorMessage = "CreatedBy must be a positive number")]
+        public int CreatedBy { get; set; }
     }
 }
