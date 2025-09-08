@@ -433,10 +433,7 @@ namespace Employee_Management_System_Backend.Services
                             <span class='label'>Employee ID:</span>
                             <span class='value'>{employee.Id}</span>
                         </div>
-                        <div class='section'>
-                            <span class='label'>Department:</span>
-                            <span class='value'>{employee.DepartmentName ?? "Not Assigned"}</span>
-                        </div>
+                       
                     </div>
                     
                     <div class='salary-section'>
