@@ -15,6 +15,26 @@ namespace Employee_Management_System_Backend.Data
             _conn = config.GetConnectionString("DefaultConnection");
         }
 
+        public async Task<List<DepartmentEmployee>> GetAllDepartmentEmployeesAsync()
+        {
+            var list = new List<DepartmentEmployee>();
+            using var conn = new SqlConnection(_conn);
+            using var cmd = new SqlCommand("SELECT Id, DepartmentId, EmployeeId FROM DepartmentEmployees", conn);
+
+            await conn.OpenAsync();
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                list.Add(new DepartmentEmployee
+                {
+                    Id = reader.GetInt32(0),
+                    DepartmentId = reader.GetInt32(1),
+                    EmployeeId = reader.GetInt32(2)
+                });
+            }
+            return list;
+        }
+
         public async Task AssignEmployeeToDepartmentsAsync(int employeeId, List<int> departmentIds)
         {
             using var conn = new SqlConnection(_conn);

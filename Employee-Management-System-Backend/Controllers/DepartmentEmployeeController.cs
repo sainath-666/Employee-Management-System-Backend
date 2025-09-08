@@ -17,6 +17,14 @@ namespace Employee_Management_System_Backend.Controllers
             _repo = repo;
         }
 
+        // GET: api/departmentemployee
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<DepartmentEmployee>>> GetAllDepartmentEmployees()
+        {
+            var deptEmps = await _repo.GetAllDepartmentEmployeesAsync();
+            return Ok(deptEmps);
+        }
+
         // POST: api/departmentemployee
         // Assign employee to one or multiple departments
         [HttpPost]
