@@ -4,6 +4,7 @@ using NReco.PdfGenerator;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Globalization;
 
 namespace Employee_Management_System_Backend.Services
 {
@@ -18,79 +19,75 @@ namespace Employee_Management_System_Backend.Services
             _payslipRepository = payslipRepository;
         }
 
-        // UPDATED: Use PayslipWithEmployee DTO instead of separate queries
+        // Helper method to format currency in Indian format
+        private static string FormatIndianCurrency(decimal amount)
+        {
+            var culture = new CultureInfo("en-IN");
+            return amount.ToString("C", culture).Replace("₹", "₹ ");
+        }
+
+        // Generates a payslip PDF file and saves it on disk. Returns the saved file path.
         public async Task<string> GeneratePayslipPdfAsync(int employeeId, int payslipId)
         {
             var payslipWithEmployee = await _payslipRepository.GetPayslipWithEmployeeAsync(payslipId);
             if (payslipWithEmployee == null)
                 throw new Exception("Payslip not found");
-
             var htmlContent = GeneratePayslipHtmlFromPayslipWithEmployee(payslipWithEmployee);
             var fileName = $"Payslip_{employeeId}_{payslipId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
             var folderPath = Path.Combine("Uploads", "Payslips");
-
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
             }
-
             var fullFilePath = Path.Combine(folderPath, fileName);
             var pdfBytes = GeneratePdfBytesFromHtml(htmlContent);
-
             await File.WriteAllBytesAsync(fullFilePath, pdfBytes);
-
-            // FIXED: Correct escape sequence for backslashes
             var databasePath = Path.Combine("Uploads", "Payslips", fileName).Replace("\\", "/");
             await _payslipRepository.UpdatePdfPathAsync(payslipId, databasePath);
-
             return fullFilePath;
         }
 
+        // Generates a payslip PDF and returns it as a byte array (for download).
         public async Task<byte[]> GeneratePayslipPdfBytesAsync(int employeeId, int payslipId)
         {
             var payslipWithEmployee = await _payslipRepository.GetPayslipWithEmployeeAsync(payslipId);
             if (payslipWithEmployee == null)
                 throw new Exception("Payslip not found");
-
             var htmlContent = GeneratePayslipHtmlFromPayslipWithEmployee(payslipWithEmployee);
             return GeneratePdfBytesFromHtml(htmlContent);
         }
 
+        // UPDATED - Generates payslip PDF from frontend request data (fetches salary from DB)
         public async Task<string> GeneratePayslipFromRequestAsync(PayslipRequest request)
         {
             var employee = await _employeeRepository.GetEmployeeWithDepartmentAsync(request.EmployeeId);
             if (employee == null)
                 throw new Exception("Employee not found");
-
             var fileName = $"Payslip_{request.EmployeeId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
             var folderPath = Path.Combine("Uploads", "Payslips");
-
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
             }
-
             var fullFilePath = Path.Combine(folderPath, fileName);
             var htmlContent = GeneratePayslipHtmlFromDatabaseData(employee, request);
             var pdfBytes = GeneratePdfBytesFromHtml(htmlContent);
-
             await File.WriteAllBytesAsync(fullFilePath, pdfBytes);
-
-            // FIXED: Correct escape sequence
             var databasePath = Path.Combine("Uploads", "Payslips", fileName).Replace("\\", "/");
             return databasePath;
         }
 
+        // UPDATED - Generates payslip PDF from frontend request data and returns it as byte array
         public async Task<byte[]> GeneratePayslipBytesFromRequestAsync(PayslipRequest request)
         {
             var employee = await _employeeRepository.GetEmployeeWithDepartmentAsync(request.EmployeeId);
             if (employee == null)
                 throw new Exception("Employee not found");
-
             var htmlContent = GeneratePayslipHtmlFromDatabaseData(employee, request);
             return GeneratePdfBytesFromHtml(htmlContent);
         }
 
+        // UPDATED - Converts JSON string to PDF and saves it on disk
         public async Task<string> GeneratePayslipFromJsonAsync(string jsonData)
         {
             try
@@ -99,32 +96,23 @@ namespace Employee_Management_System_Backend.Services
                 {
                     PropertyNameCaseInsensitive = true
                 });
-
                 if (request == null)
                     throw new Exception("Invalid JSON data provided");
-
                 if (request.EmployeeId <= 0)
                     throw new Exception("Valid Employee ID is required in JSON");
-
                 var employee = await _employeeRepository.GetEmployeeWithDepartmentAsync(request.EmployeeId);
                 if (employee == null)
                     throw new Exception($"Employee with ID {request.EmployeeId} not found");
-
                 var fileName = $"Payslip_{request.EmployeeId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
                 var folderPath = Path.Combine("Uploads", "Payslips");
-
                 if (!Directory.Exists(folderPath))
                 {
                     Directory.CreateDirectory(folderPath);
                 }
-
                 var fullFilePath = Path.Combine(folderPath, fileName);
                 var htmlContent = GeneratePayslipHtmlFromDatabaseData(employee, request);
                 var pdfBytes = GeneratePdfBytesFromHtml(htmlContent);
-
                 await File.WriteAllBytesAsync(fullFilePath, pdfBytes);
-
-                // FIXED: Correct escape sequence
                 var databasePath = Path.Combine("Uploads", "Payslips", fileName).Replace("\\", "/");
                 return databasePath;
             }
@@ -138,6 +126,7 @@ namespace Employee_Management_System_Backend.Services
             }
         }
 
+        // UPDATED - Converts JSON string to PDF and returns it as byte array
         public async Task<byte[]> GeneratePayslipBytesFromJsonAsync(string jsonData)
         {
             try
@@ -146,17 +135,13 @@ namespace Employee_Management_System_Backend.Services
                 {
                     PropertyNameCaseInsensitive = true
                 });
-
                 if (request == null)
                     throw new Exception("Invalid JSON data provided");
-
                 if (request.EmployeeId <= 0)
                     throw new Exception("Valid Employee ID is required in JSON");
-
                 var employee = await _employeeRepository.GetEmployeeWithDepartmentAsync(request.EmployeeId);
                 if (employee == null)
                     throw new Exception($"Employee with ID {request.EmployeeId} not found");
-
                 var htmlContent = GeneratePayslipHtmlFromDatabaseData(employee, request);
                 return GeneratePdfBytesFromHtml(htmlContent);
             }
@@ -170,28 +155,24 @@ namespace Employee_Management_System_Backend.Services
             }
         }
 
+        // Converts HTML content to PDF and saves it on disk.
         public async Task<string> GeneratePayslipPdfFromHtmlAsync(string htmlContent, int payslipId)
         {
             var fileName = $"Payslip_{payslipId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
             var folderPath = Path.Combine("Uploads", "Payslips");
-
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
             }
-
             var fullFilePath = Path.Combine(folderPath, fileName);
             var pdfBytes = GeneratePdfBytesFromHtml(htmlContent);
-
             await File.WriteAllBytesAsync(fullFilePath, pdfBytes);
-
-            // FIXED: Correct escape sequence
             var databasePath = Path.Combine("Uploads", "Payslips", fileName).Replace("\\", "/");
             await _payslipRepository.UpdatePdfPathAsync(payslipId, databasePath);
-
             return fullFilePath;
         }
 
+        // Generates PDF bytes from HTML string.
         public byte[] GeneratePdfBytesFromHtml(string htmlContent)
         {
             try
@@ -214,7 +195,7 @@ namespace Employee_Management_System_Backend.Services
             }
         }
 
-        // PERFECT: Generate HTML from PayslipWithEmployee DTO including Department Name
+        // UPDATED - Generates HTML from PayslipWithEmployee DTO with Indian currency formatting
         private static string GeneratePayslipHtmlFromPayslipWithEmployee(PayslipWithEmployee payslip)
         {
             return $@"
@@ -288,19 +269,19 @@ namespace Employee_Management_System_Backend.Services
                     <div class='salary-section'>
                         <div class='section'>
                             <span class='label'>Base Salary:</span>
-                            <span class='value'>${payslip.BaseSalary:F2}</span>
+                            <span class='value'>{FormatIndianCurrency(payslip.BaseSalary)}</span>
                         </div>
                         <div class='section'>
                             <span class='label'>Allowances:</span>
-                            <span class='value'>${payslip.Allowances:F2}</span>
+                            <span class='value'>{FormatIndianCurrency(payslip.Allowances)}</span>
                         </div>
                         <div class='section'>
                             <span class='label'>Deductions:</span>
-                            <span class='value'>${payslip.Deductions:F2}</span>
+                            <span class='value'>{FormatIndianCurrency(payslip.Deductions)}</span>
                         </div>
                         <div class='total'>
                             <span class='label'>Net Salary:</span>
-                            <span class='value'>${payslip.NetSalary:F2}</span>
+                            <span class='value'>{FormatIndianCurrency(payslip.NetSalary)}</span>
                         </div>
                     </div>
                     
@@ -311,10 +292,14 @@ namespace Employee_Management_System_Backend.Services
                 </html>";
         }
 
+        // UPDATED - Generates HTML from EmployeeWithDepartment data with Indian currency formatting
         private static string GeneratePayslipHtmlFromDatabaseData(EmployeeWithDepartment employee, PayslipRequest request)
         {
             var payslipMonth = DateTime.Now.ToString("MMMM yyyy");
-            var netSalary = request.BaseSalary + request.Allowances - request.Deductions;
+            var baseSalary = employee.Salary;
+            var allowances = 0m;
+            var deductions = 0m;
+            var netSalary = baseSalary + allowances - deductions;
 
             return $@"
                 <!DOCTYPE html>
@@ -433,7 +418,10 @@ namespace Employee_Management_System_Backend.Services
                             <span class='label'>Employee ID:</span>
                             <span class='value'>{employee.Id}</span>
                         </div>
-                       
+                        <div class='section'>
+                            <span class='label'>Department:</span>
+                            <span class='value'>{employee.DepartmentName ?? "Not Assigned"}</span>
+                        </div>
                     </div>
                     
                     <div class='salary-section'>
@@ -441,22 +429,22 @@ namespace Employee_Management_System_Backend.Services
                         
                         <div class='salary-row'>
                             <span class='label'>Base Salary:</span>
-                            <span class='amount'>${request.BaseSalary:F2}</span>
+                            <span class='amount'>{FormatIndianCurrency(baseSalary)}</span>
                         </div>
                         
                         <div class='salary-row'>
                             <span class='label'>Allowances:</span>
-                            <span class='amount'>${request.Allowances:F2}</span>
+                            <span class='amount'>{FormatIndianCurrency(allowances)}</span>
                         </div>
                         
                         <div class='salary-row'>
                             <span class='label'>Deductions:</span>
-                            <span class='amount deduction'>-${request.Deductions:F2}</span>
+                            <span class='amount deduction'>-{FormatIndianCurrency(deductions)}</span>
                         </div>
                         
                         <div class='total-row salary-row'>
                             <span class='label' style='color: #28a745; font-size: 18px;'>Net Salary:</span>
-                            <span class='total-amount'>${netSalary:F2}</span>
+                            <span class='total-amount'>{FormatIndianCurrency(netSalary)}</span>
                         </div>
                     </div>
                     
@@ -467,6 +455,36 @@ namespace Employee_Management_System_Backend.Services
                     </div>
                 </body>
                 </html>";
+        }
+
+        // Generate payslip PDFs for multiple employees
+        public async Task<Dictionary<int, string>> GeneratePayslipsPdfForMultipleAsync(List<int> employeeIds, int createdBy)
+        {
+            if (employeeIds == null || employeeIds.Count == 0)
+                throw new ArgumentException("Employee ID list cannot be null or empty.");
+
+            var result = new Dictionary<int, string>();
+
+            foreach (var empId in employeeIds)
+            {
+                var payslipRequest = new PayslipRequest
+                {
+                    EmployeeId = empId,
+                    CreatedBy = createdBy
+                };
+
+                try
+                {
+                    var pdfPath = await GeneratePayslipFromRequestAsync(payslipRequest);
+                    result.Add(empId, pdfPath);
+                }
+                catch (Exception)
+                {
+                    // Optionally handle/log exceptions
+                }
+            }
+
+            return result;
         }
     }
 }

@@ -13,6 +13,7 @@
         public int RoleId { get; set; }
         public int? DepartmentId { get; set; }
         public string? DepartmentName { get; set; } // From Department table JOIN
+        public decimal Salary { get; set; } // Added Salary property for payslip generation
         public bool Status { get; set; }
         public DateTime CreatedDateTime { get; set; }
     }

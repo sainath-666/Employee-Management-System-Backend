@@ -23,5 +23,8 @@ namespace Employee_Management_System_Backend.Data
 
         // NEW: Method to get payslips by employee ID
         Task<IEnumerable<Payslip>> GetPayslipsByEmployeeIdAsync(int employeeId);
+
+        // ✅ ADDED: Method to get latest payslip by employee ID (Required for PUT methods)
+        Task<Payslip?> GetLatestPayslipByEmployeeIdAsync(int employeeId);
     }
 }
