@@ -72,14 +72,19 @@ namespace Employee_Management_System_Backend.Data
         public async Task<int> CreateAsync(Employee employee)
         {
             await using var con = new SqlConnection(_connectionString);
-            await using var cmd = new SqlCommand(@"
-                INSERT INTO Employees
-                    (EmployeeCode, Name, Email, MobileNumber, Gender, DOB, ProfilePhotoPath, RoleId, Password, Status, CreatedBy, CreatedDateTime)
-                OUTPUT INSERTED.Id
-                VALUES
-                    (@EmployeeCode, @Name, @Email, @MobileNumber, @Gender, @DOB, @ProfilePhotoPath, @RoleId, @Password, @Status, @CreatedBy, @CreatedDateTime)", con);
-            AddParameters(cmd, employee);
             await con.OpenAsync();
+
+            // ✅ Auto-generate employee code
+            employee.EmployeeCode = await GenerateEmployeeCodeAsync(con);
+
+            await using var cmd = new SqlCommand(@"
+        INSERT INTO Employees
+            (EmployeeCode, Name, Email, MobileNumber, Gender, DOB, ProfilePhotoPath, RoleId, Password, Status, CreatedBy, CreatedDateTime)
+        OUTPUT INSERTED.Id
+        VALUES
+            (@EmployeeCode, @Name, @Email, @MobileNumber, @Gender, @DOB, @ProfilePhotoPath, @RoleId, @Password, @Status, @CreatedBy, @CreatedDateTime)", con);
+
+            AddParameters(cmd, employee);
             var result = await cmd.ExecuteScalarAsync();
             return Convert.ToInt32(result);
         }
@@ -199,6 +204,26 @@ namespace Employee_Management_System_Backend.Data
                 _ => throw new ArgumentException("Invalid gender value. Allowed values: Male, Female, Other")
             };
         }
+
+        private async Task<string> GenerateEmployeeCodeAsync(SqlConnection con)
+        {
+            var query = "SELECT TOP 1 EmployeeCode FROM Employees ORDER BY Id DESC";
+            await using var cmd = new SqlCommand(query, con);
+            var lastCode = await cmd.ExecuteScalarAsync() as string;
+
+            int nextNumber = 1;
+            if (!string.IsNullOrEmpty(lastCode) && lastCode.StartsWith("CLOVE-"))
+            {
+                string numPart = lastCode.Split('-')[1];
+                if (int.TryParse(numPart, out int lastNumber))
+                {
+                    nextNumber = lastNumber + 1;
+                }
+            }
+
+            return $"CLOVE-{nextNumber.ToString("D5")}";
+        }
+
 
         // Save profile photo file
         private async Task<string?> SaveProfilePhotoAsync(IFormFile? file)

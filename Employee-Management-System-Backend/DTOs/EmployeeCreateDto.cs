@@ -6,8 +6,8 @@ namespace Employee_Management_System_Backend.DTOs
 {
     public class EmployeeCreateDto
     {
-        [Required]
-        public required string EmployeeCode { get; set; }
+        //[Required]
+        //public required string EmployeeCode { get; set; }
 
         [Required]
         public required string Name { get; set; }
