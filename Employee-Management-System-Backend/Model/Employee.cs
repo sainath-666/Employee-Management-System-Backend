@@ -9,7 +9,7 @@ namespace Employee_Management_System_Backend.Model
 
         [Required(ErrorMessage = "Employee code is required")]
         [StringLength(20, ErrorMessage = "Employee code cannot exceed 20 characters")]
-        public required string EmployeeCode { get; set; }
+        public string EmployeeCode { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Name is required")]
         [StringLength(150, ErrorMessage = "Name cannot exceed 150 characters")]

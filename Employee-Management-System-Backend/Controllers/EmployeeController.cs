@@ -43,13 +43,11 @@ namespace Employee_Management_System_Backend.Controllers
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             string? filePath = await SaveProfilePhotoAsync(dto.ProfilePhoto);
-
-            // Hash the password using BCrypt or similar secure method
             string hashedPassword = HashPassword(dto.Password);
 
             var employee = new Employee
             {
-                EmployeeCode = dto.EmployeeCode,
+                // EmployeeCode is auto-generated inside repository ✅
                 Name = dto.Name,
                 Email = dto.Email,
                 MobileNumber = dto.MobileNumber,
@@ -57,14 +55,15 @@ namespace Employee_Management_System_Backend.Controllers
                 DOB = dto.DOB,
                 ProfilePhotoPath = filePath,
                 RoleId = dto.RoleId,
-                Password = hashedPassword, // Single hashed password field
+                Password = hashedPassword,
                 Status = true,
                 CreatedDateTime = DateTime.Now
             };
 
             var newId = await _repository.CreateAsync(employee);
-            return Ok(new { Message = "Employee created successfully.", Id = newId });
+            return Ok(new { Message = "Employee created successfully.", Id = newId, EmployeeCode = employee.EmployeeCode });
         }
+
 
         // PUT: api/Employee/5
         [HttpPut("{id}")]
