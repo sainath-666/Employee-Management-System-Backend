@@ -1,5 +1,4 @@
 ﻿using Employee_Management_System_Backend.Model;
-
 namespace Employee_Management_System_Backend.Services
 {
     public interface IPdfService
@@ -36,5 +35,11 @@ namespace Employee_Management_System_Backend.Services
         /// Converts JSON string to PDF and returns it as byte array.
         /// </summary>
         Task<byte[]> GeneratePayslipBytesFromJsonAsync(string jsonData);
+
+        /// <summary>
+        /// Generates payslip PDFs in bulk for multiple employee IDs.
+        /// Returns dictionary mapping employeeId to saved PDF path.
+        /// </summary>
+        Task<Dictionary<int, string>> GeneratePayslipsPdfForMultipleAsync(List<int> employeeIds, int createdBy);
     }
 }

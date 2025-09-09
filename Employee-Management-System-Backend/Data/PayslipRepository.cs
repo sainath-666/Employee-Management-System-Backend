@@ -10,6 +10,7 @@ namespace Employee_Management_System_Backend.Data
     public class PayslipRepository : IPayslipRepository
     {
         private readonly string _connectionString;
+
         public PayslipRepository(IConfiguration config)
         {
             _connectionString = config.GetConnectionString("DefaultConnection")
@@ -28,18 +29,28 @@ namespace Employee_Management_System_Backend.Data
         {
             var payslips = new List<Payslip>();
             var query = "SELECT * FROM Payslips WHERE EmployeeId = @EmployeeId ORDER BY CreatedDateTime DESC";
-
             using var conn = new SqlConnection(_connectionString);
             using var cmd = new SqlCommand(query, conn);
             cmd.Parameters.AddWithValue("@EmployeeId", employeeId);
             await conn.OpenAsync();
-
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
                 payslips.Add(MapToPayslip(reader));
             }
             return payslips;
+        }
+
+        // ✅ NEW - Get latest payslip by employee ID (Required for PUT methods)
+        public async Task<Payslip?> GetLatestPayslipByEmployeeIdAsync(int employeeId)
+        {
+            var query = "SELECT TOP 1 * FROM Payslips WHERE EmployeeId = @EmployeeId ORDER BY CreatedDateTime DESC";
+            using var conn = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@EmployeeId", employeeId);
+            await conn.OpenAsync();
+            using var reader = await cmd.ExecuteReaderAsync();
+            return await reader.ReadAsync() ? MapToPayslip(reader) : null;
         }
 
         // Update PDF path for existing payslip
