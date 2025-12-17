@@ -1,0 +1,19 @@
+**/.git
+**/.vs
+**/.vscode
+
+**/bin
+**/obj
+
+**/*.user
+**/*.suo
+**/*.cache
+
+# Don't bake runtime uploads into the image
+Uploads
+wwwroot/uploads
+
+# Docker artifacts
+**/Dockerfile
+**/.dockerignore
+

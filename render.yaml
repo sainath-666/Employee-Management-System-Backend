@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: employee-management-backend
+    env: docker
+    rootDir: Employee-Management-System-Backend
+    autoDeploy: true
+
